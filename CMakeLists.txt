@@ -3,7 +3,7 @@ project(json C)
 
 set(CMAKE_C_STANDARD 11)
 
-add_library(json SHARED library.c library.h )
+add_library(json SHARED json.c json.h)
 
 add_executable(main main.c main.h)
 

@@ -1,5 +1,5 @@
-#ifndef JSON_LIBRARY_H
-#define JSON_LIBRARY_H
+#ifndef JSON_JSON_H
+#define JSON_JSON_H
 #include<stdio.h>
 #include<stdlib.h>
 
@@ -14,23 +14,27 @@
  * Json doesn't require json arrays elements to have an order so sibling data is not stored
  */
 
-
-struct node {
-    enum kind {
-        object,
-        array,
-        number,
-        string,
-        json_true,
-        json_false,
-        json_null
-    } kind;
+enum json_value_kind {
+    object,
+    array,
+    number,
+    string,
+    json_true,
+    json_false,
+    json_null
 };
 
-extern enum json_errors {
-    JSONERR_NO_ERRORS = 0,
-    JSONERR_INVALID_CHARACTER
-} json_error;
+struct json_value {
+    enum json_value_kind kind;
+    int parent;
+};
+
+struct json_parsed {
+    int values_count;
+    struct json_value values[];
+};
+
+extern enum json_errors json_error;
 
 #define STRUCTURAL \
   X(LEFT_SQUARE_BRACKET, '[') \
@@ -51,29 +55,43 @@ extern enum json_errors {
   X(CARRIAGE_RETURN, '\r') \
   X(SPACE, ' ')
 
+#define ERRORS \
+  X(JSON_ERROR_NO_ERRORS, "No errors found.") \
+  X(JSON_ERROR_INVALID_CHARACTER, "Found an invalid character.") \
+  X(JSON_ERROR_JSON_TOO_SHORT, "End of JSON before we could parse any meaningful token.") \
+  X(JSON_ERROR_TWO_OBJECTS_HAVE_SAME_PARENT, "Two values have the same parent.") \
+  X(JSON_ERROR_EMPTY, "A JSON document can't be empty.")
+
+
 #define X(a, b) a,
 enum structural_tokens { STRUCTURAL };
 enum literal_name_tokens { LITERAL };
 enum whitespace_tokens { WHITESPACE };
+enum json_errors{ ERRORS };
 #undef X
 
 #define X(a, b) [a] = b,
-char structural_tokens[] = {
+char structurals[] = {
     STRUCTURAL
 };
 
-char * literal_name_tokens[] = {
+char * litterals[] = {
     LITERAL
 };
 
-char whitespace_tokens[] = {
+char whitespaces[] = {
     WHITESPACE '\0'
+};
+
+char * json_errors[] = {
+    ERRORS
 };
 #undef X
 
 #undef STRUCTURAL
 #undef LITERAL
 #undef WHITESPACE
+#undef ERRORS
 
 char digits[] = "0123456789";
 char digits19[] = "123456789";
@@ -90,10 +108,11 @@ enum states {
     OPEN_OBJECT
 };
 
-void hello(void);
-char * encode_json(struct node node);
-struct node * decode_json(const char * str);
-void free_json(struct node * node);
+char * encode_json(struct json_parsed *json_parsed);
+struct json_parsed * decode_json(const char *str, unsigned int length);
+void free_json(struct json_parsed *json_parsed);
 void free_json_str(char * json_str);
+struct json_parsed * push_node(enum json_value_kind kind, int parent, struct json_parsed *json_parsed);
+bool json_check_validity(struct json_parsed * json_parsed);
 
-#endif //JSON_LIBRARY_H
+#endif //JSON_JSON_H
