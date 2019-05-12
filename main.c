@@ -1,14 +1,26 @@
 #include "main.h"
 #include "json.h"
 
-char * testdata[] = {
+char * valid_json[] = {
     "true",
+    "0",
+    "-0",
     "1",
     "123",
     "1203.4",
     "123.0",
     "123.05",
     "123.0e12",
+    "12e0",
+    "12e+0",
+    "12e-0",
+    "12e1",
+    "-12e1",
+    "12e01",
+    "12e+01",
+    "-12e+01",
+    "12e-01",
+    "-12e-01",
     "-12.34e+25",
     "-12.34E+25",
     "-12.34E-25",
@@ -84,8 +96,32 @@ char * bogusjson[] = {
     "\"characters between 00 and 1F must use the unicode codepoint notation, \\u0000, not \1, \2, \0 .\"",
     "\"true and\" false",
     "0123", /* leading zeros are forbidden */
+    "+0",
+    "+1",
+    "+12",
+    "--12",
+    "-f12",
+    "-1-2",
+    "-12-.",
+    "-12.-0",
+    "-12e12-2",
+    "-12e++12-2",
+    "-12e+-122",
+    "-12e--12-2",
     ".12",
+    "0.",
+    "-0.",
+    "0.e",
+    "-0.E",
+    "0.t",
+    "-0.~",
+    "0e",
+    "-0e",
     "12.",
+    "12..",
+    "12..001",
+    "12.001.",
+    "12.3.",
     "12.e10",
     "NaN",
     "Infinity",
@@ -94,21 +130,26 @@ char * bogusjson[] = {
     "123e",
     "123.4e",
     "123.4E",
+    "0e+",
+    "0e-",
     "123.4e23e",
+    "123.4E23e",
     "123.4e23.",
     "123.4e23,",
+    "12,3.4e23,",
+    "123.4e,23,",
+    "123.4e2,3,",
 };
 
 int main(int argc, char * argv[]) {
 
-    printf("Hello!\n");
-    for (int i = 0; i < sizeof(testdata) / sizeof(testdata[0]) ; i++) {
+    for (int i = 0; i < sizeof(valid_json) / sizeof(valid_json[0]) ; i++) {
         json_error = JSON_ERROR_NO_ERRORS;
-        struct json_parsed * json_parsed = decode_json(testdata[i], strlen(testdata[i]));
+        struct json_parsed * json_parsed = decode_json(valid_json[i], strlen(valid_json[i]));
         printf("%s", encode_json(json_parsed));
         free_json(json_parsed);
 
-        printf("For >>> %s <<<, \n -> %s\n", testdata[i], json_errors[json_error]);
+        printf("For >>> %s <<<, \n -> %s\n", valid_json[i], json_errors[json_error]);
     }
 
     puts("\n\n\n*** ALL SHOULD FAIL ***");
