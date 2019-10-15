@@ -133,7 +133,7 @@ struct json_parsed * decode_json(const char *str, unsigned int length) {
         break;
     }
 
-    if (!json_check_validity(json_parsed)) {
+    if (!json_semcheck(json_parsed)) {
         goto panic;
     }
 
@@ -345,11 +345,11 @@ void free_json_str(char * json_str) {
 }
 
 /**
- * Checks the validity of a parsed json text
+ * Checks the parsed json follows json format rules
  * @param json_parsed
  * @return
  */
-bool json_check_validity(struct json_parsed * json_parsed) {
+bool json_semcheck(struct json_parsed *json_parsed) {
     bool valid = true;
 
     if(json_parsed->values_count == 0) {

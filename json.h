@@ -133,7 +133,7 @@ struct json_parsed * decode_json(const char *str, unsigned int length);
 void free_json(struct json_parsed *json_parsed);
 void free_json_str(char * json_str);
 struct json_parsed *push_node(enum json_value_kind kind, int parent, size_t *address, struct json_parsed *json_parsed);
-bool json_check_validity(struct json_parsed * json_parsed);
+bool json_semcheck(struct json_parsed *json_parsed);
 int json_parse_number(const char *str, int len);
 
 #endif //JSON_JSON_H
