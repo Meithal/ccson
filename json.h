@@ -2,9 +2,7 @@
 #define JSON_JSON_H
 #include<stdio.h>
 #include<stdlib.h>
-
 #include<stdbool.h>
-
 #include<string.h>
 
 
@@ -91,14 +89,17 @@ enum json_errors{ ERRORS };
 #define X(a, b) [a] = b,
 char structs[] = {
     STRUCTURAL
+    '\0',
 };
 
 char * lits[] = {
     LITERAL
+    NULL,
 };
 
 char whsps[] = {
-    WHITESPACE '\0'
+    WHITESPACE
+    '\0',
 };
 
 char * json_errors[] = {
@@ -125,7 +126,26 @@ enum states {
     PARSING_TRUE,
     PARSING_FALSE,
     OPEN_ARRAY,
-    OPEN_OBJECT
+    OPEN_OBJECT,
+};
+
+enum new_state {
+    NS_BEFORE_VALUE
+
+};
+
+#define STATES \
+  X(STATE_BEFORE_VAL, .ws=true)\
+  X(STATE_AFTER_VAL, .ws=true)\
+  X(STATE_OBJECT_AFTER_OPEN_BRACE, .ws=true)\
+  X(STATE_OBJECT_BEFORE_CLOSING_BRACE, .ws=false)\
+  X(STATE_OBJECT_KEYSTRING_MET, .ws=false)\
+  X(STATE_OBJECT_KEYSTRING_AFTER, .ws=true)\
+
+
+struct state {
+    bool skipe_whitespace;
+    enum new_state kind;
 };
 
 char * encode_json(struct json_parsed *json_parsed);
@@ -135,5 +155,7 @@ void free_json_str(char * json_str);
 struct json_parsed *push_node(enum json_value_kind kind, int parent, size_t *address, struct json_parsed *json_parsed);
 bool json_semcheck(struct json_parsed *json_parsed);
 int json_parse_number(const char *str, int len);
+
+struct json_parsed * ndecode_json(const char *str, unsigned int length);
 
 #endif //JSON_JSON_H

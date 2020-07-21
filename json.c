@@ -15,7 +15,7 @@ char * encode_json(struct json_parsed *json_parsed) {
  */
 struct json_parsed * decode_json(const char *str, unsigned int length) {
     enum states state = BEFORE_TOKEN;
-    int index = 0;
+    size_t index = 0;
     int current_root = 0;
 
     struct json_parsed * json_parsed = malloc(sizeof(struct json_parsed));
@@ -328,9 +328,8 @@ struct json_parsed *push_node(enum json_value_kind kind, int parent, size_t *add
         .parent = parent
     };
 
-    json_parsed->values_count++;
-    realloc(json_parsed, sizeof(struct json_parsed) + json_parsed->values_count * sizeof(json_parsed->values[0]));
-    json_parsed->values[json_parsed->values_count - 1] = node;
+    realloc(json_parsed, sizeof(struct json_parsed) + (json_parsed->values_count + 1) * sizeof(json_parsed->values[0]));
+    json_parsed->values[json_parsed->values_count++] = node;
 
     return json_parsed;
 }
