@@ -1,3 +1,4 @@
+#ifdef OLD_FORMAT
 #include "json.h"
 
 enum json_errors json_error;
@@ -13,7 +14,7 @@ char * encode_json(struct json_parsed *json_parsed) {
  * @param length
  * @return
  */
-struct json_parsed * decode_json(const char *str, unsigned int length) {
+struct json_parsed * decode_json(const char *str, size_t length) {
     enum states state = BEFORE_TOKEN;
     size_t index = 0;
     int current_root = 0;
@@ -49,7 +50,7 @@ struct json_parsed * decode_json(const char *str, unsigned int length) {
                 state = PARSING_NULL;
                 continue;
             }
-            else if (strchr(whsps, c)) {
+            else if (strchr(whitespaces, c)) {
                 index += 1;
                 continue;
             }
@@ -153,7 +154,7 @@ struct json_parsed * decode_json(const char *str, unsigned int length) {
  * @param len
  * @return
  */
-int json_parse_number(const char *str, int len) {
+int json_parse_number(const char *str, size_t len) {
     int i = 0;
 
     struct states {
@@ -167,9 +168,9 @@ int json_parse_number(const char *str, int len) {
         bool decimal_dot_found;
         bool right_after_decimal_dot;
         bool exponent_found;
-        bool right_after_exponent;
-        bool plus_minus_after_exponent_found;
-        bool digit_after_exponent_found;
+        bool right_after_exponent;  /* 12e */
+        bool plus_minus_after_exponent_found;  /* 12e+ */
+        bool digit_after_exponent_found;  /* 12e+4 */
     } state = { .parsing_first_character = true };
 
     while (true) {
@@ -191,9 +192,7 @@ int json_parse_number(const char *str, int len) {
             return i - 1;
         }
 
-
-        /* leading */
-
+        /* <- leading */
         if (state.must_find_dot_or_exp_or_end) {
 
             if (!strchr(".eE", c)) {
@@ -223,7 +222,7 @@ int json_parse_number(const char *str, int len) {
 
 //        if (!state.decimal_dot_found)
 
-        /* leading / */
+        /* leading -> */
 
         /* minus */
         if (c == '-' && !state.parsing_first_character && !state.right_after_exponent) {
@@ -358,3 +357,4 @@ bool json_semcheck(struct json_parsed *json_parsed) {
 
     return valid;
 }
+#endif
