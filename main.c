@@ -1,6 +1,6 @@
-#include "main.h"
 #include "json.h"
 #include <assert.h>
+#include <stdio.h>
 
 char * valid_json[] = {
     "true",

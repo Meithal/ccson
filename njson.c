@@ -58,6 +58,7 @@ int rjson(char* string, struct state* state) {
 
     // todo: make fully reentrant
     // todo: make ANSI/STDC compatible
+    // fixme: handle unicode literals
 
     if (state->ordinal == 0) {
         state->error = JSON_ERROR_NO_ERRORS;
