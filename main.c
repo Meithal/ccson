@@ -172,6 +172,10 @@ char * bogusjson[] = {
     "123.4e2,3,",
     "{true: 1}",
     "{false: 1}",
+    "[false, 1] true",
+    "[false, 1], true",
+    "{false: 1}, true",
+    "{false: 1, true}",
     "{null: 1}",
     "{2: 1}",
     "{[true]: 1}",
@@ -181,15 +185,9 @@ char * bogusjson[] = {
     "{\"test\":}",
 };
 
-int main(int argc, char * argv[], char* env[]) {
+int main(void) {
+
     for (int i = 0; i < sizeof(valid_json) / sizeof(valid_json[0]) ; i++) {
-//        json_error = JSON_ERROR_NO_ERRORS;
-//        struct json_parsed * json_parsed = decode_json(valid_json[i], strlen(valid_json[i]));
-//        printf("%s", encode_json(json_parsed));
-//
-//        free_json(json_parsed);
-//
-//        printf("For >>> %s <<<, \n -> %s\n", valid_json[i], json_errors[json_error]);
         struct state state = {0};
         rjson(valid_json[i], &state);
         printf("For >>> %s <<<, \n -> %s\n", valid_json[i], json_errors[state.error]);
@@ -199,24 +197,16 @@ int main(int argc, char * argv[], char* env[]) {
     }
 
     puts("\n\n\n*** ALL SHOULD FAIL ***");
-//
+
     for (int i = 0; i < sizeof(bogusjson) / sizeof(bogusjson[0]) ; i++) {
-//        json_error = JSON_ERROR_NO_ERRORS;
-//        struct json_parsed * json_parsed = decode_json(bogusjson[i], strlen(bogusjson[i]));
-//        printf("%s", encode_json(json_parsed));
-//        free_json(json_parsed);
-//
-//        printf("For >>> %s <<<, \n -> %s\n", bogusjson[i], json_errors[json_error]);
+
         struct state state = {0};
         rjson(bogusjson[i], &state);
         printf("For >>> %s <<<, \n -> %s\n", bogusjson[i], json_errors[state.error]);
         print_debug();
         fflush(stdout);
         assert(state.error != JSON_ERROR_NO_ERRORS);
-
     }
-//
-//    rjson("12", &(struct state){0});
-    (void)getchar();
+
     return 0;
 }

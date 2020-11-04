@@ -81,7 +81,7 @@ extern enum json_errors json_error;
 
 #define ERRORS \
   X(JSON_ERROR_NO_ERRORS, "No errors found.") \
-  X(JSON_ERROR_INVALID_CHARACTER, "Found an invalid character.") \
+  X(JSON_ERROR_INVALID_CHARACTER, "Found an unknown token.") \
   X(JSON_ERROR_JSON_TOO_SHORT, "End of JSON before we could parse any meaningful token.") \
   X(JSON_ERROR_TWO_OBJECTS_HAVE_SAME_PARENT, "Two values have the same parent.") \
   X(JSON_ERROR_EMPTY, "A JSON document can't be empty.") \
@@ -102,7 +102,8 @@ extern enum json_errors json_error;
   X(JSON_ERROR_INVALID_CHARACTER_IN_ARRAY, "Invalid character in array.") \
   X(JSON_ERROR_ASSOC_EXPECT_STRING_A_KEY, "A JSON object key must be a quoted string.") \
   X(JSON_ERROR_ASSOC_EXPECT_COLON, "Missing colon after object key.") \
-  X(JSON_ERROR_ASSOC_EXPECT_VALUE, "Missing value after JSON object key.")
+  X(JSON_ERROR_ASSOC_EXPECT_VALUE, "Missing value after JSON object key.")  \
+  X(JSON_ERROR_NO_SIBLINGS, "Only Arrays and Objects can have sibling descendants.")  \
 
 #define X(a, b) a,
 enum structural_tokens { STRUCTURAL };

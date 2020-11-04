@@ -4,14 +4,10 @@
 
 #include "json.h"
 #include "assert.h"
-#define peek_at(where) string[state->ordinal + where]
-#define set_state_and_advance_by(state_, advance_) state->kind = state_; \
-to_inc = advance_
-#define min(a, b) (a) > (b) ? (b) : (a)
 
 size_t len_whitespace(char* string, struct state * state) {
-    size_t count = 0;
-    while(strchr(whitespaces, string[state->ordinal + count]) != NULL) {
+    int count = 0;
+    while(string[state->ordinal + count] != '\0' && strchr(whitespaces, string[state->ordinal + count]) != NULL) {
         count++;
     }
     return count;
@@ -40,13 +36,28 @@ void push_token(enum kind kind, void * address, int root_index) {
     token_cursor++;
 }
 
+static inline size_t remaining(char * string, struct state* state) {
+    return strlen(string + state->ordinal);
+}
+
+static inline _Bool in(char* hay, char needle) {
+    return needle != '\0' && strchr(hay, needle);
+}
+
+#define peek_at(where) string[state->ordinal + where]
+#define set_state_and_advance_by(which_, advance_) state->kind = which_; state->ordinal += advance_; to_inc = 0
 int rjson(char* string, struct state* state) {
+
     size_t total_length = strlen(string);
+
     memcpy(tokens, (struct token [0x200]){(struct token) {.kind=ROOT}}, sizeof (struct token[0x200]));
     token_cursor = 1;
     memset(string_pool, 0, sizeof string_pool);
     string_cursor = 0;
     int root_index = 0;
+
+    // todo: make fully reentrant
+    // todo: make ANSI/STDC compatible
 
     if (state->ordinal == 0) {
         state->error = JSON_ERROR_NO_ERRORS;
@@ -55,7 +66,6 @@ int rjson(char* string, struct state* state) {
 
     while(true) {
 
-        size_t remaining = strlen(string + state->ordinal);
         int to_inc = -999;
         switch (state->kind) {
             case WHITESPACE_BEFORE_VALUE: {
@@ -70,15 +80,15 @@ int rjson(char* string, struct state* state) {
 
             case EXPECT_VALUE:
             {
-                if (strncmp(string + state->ordinal, "true", min(strlen("true"), remaining)) == 0) {
+                if (strncmp("true", string + state->ordinal, strlen("true")) == 0) {
                     push_token(TRUE, &JSON_TRUE_SINGLETON, root_index);
                     set_state_and_advance_by(WHITESPACE_AFTER_VALUE, strlen("true"));
                 }
-                else if (strncmp(string + state->ordinal, "false", min(strlen("false"), remaining)) == 0) {
+                else if (strncmp("false", string + state->ordinal, strlen("false")) == 0) {
                     push_token(FALSE, &JSON_FALSE_SINGLETON, root_index);
                     set_state_and_advance_by(WHITESPACE_AFTER_VALUE, strlen("false"));
                 }
-                else if (strncmp(string + state->ordinal, "null", min(strlen("null"), remaining)) == 0) {
+                else if (strncmp("null", string + state->ordinal, strlen("null")) == 0) {
                     push_token(JNULL, &JSON_NULL_SINGLETON, root_index);
                     set_state_and_advance_by(WHITESPACE_AFTER_VALUE, strlen("null"));
                 }
@@ -96,9 +106,15 @@ int rjson(char* string, struct state* state) {
                     push_root(&root_index);
                     set_state_and_advance_by(OPEN_ASSOC, 1);
                 }
-                else if (strchr(digit_starters, peek_at(0)) != NULL) {
+                else if (in(digit_starters, peek_at(0))) {
                     start_string();
                     set_state_and_advance_by(START_NUMBER, 0);
+                }
+                else if (tokens[root_index].kind != ROOT) {
+                    state->error = JSON_ERROR_ASSOC_EXPECT_VALUE;
+                }
+                else if (remaining(string+len_whitespace(string, state), state)) {
+                    state->error = JSON_ERROR_INVALID_CHARACTER;
                 }
                 else {
                     state->error = JSON_ERROR_EMPTY;
@@ -109,9 +125,13 @@ int rjson(char* string, struct state* state) {
             case AFTER_VALUE:
             {
                 if (tokens[root_index].kind == ROOT) {
-                    return total_length;
+                    if (remaining(string, state)) {
+                        state->error = JSON_ERROR_NO_SIBLINGS;
+                    } else {
+                        return total_length;
+                    }
                 }
-                if(tokens[root_index].kind == ARRAY) {
+                else if(tokens[root_index].kind == ARRAY) {
                     set_state_and_advance_by(ARRAY_AFTER_VALUE, 0);
                 }
                 else if(tokens[root_index].kind == OBJECT) {
@@ -189,7 +209,10 @@ int rjson(char* string, struct state* state) {
                 break;
             }
             case IN_STRING: {
-                if (peek_at(0) == '\\') {
+                if (!remaining(string + len_whitespace(string, state), state)) {
+                    state->error = JSON_ERROR_JSON_TOO_SHORT;
+                }
+                else if (peek_at(0) == '\\') {
                     set_state_and_advance_by(LITERAL_ESCAPE, 1);
                 } else if (peek_at(0) == '"') {
                     set_state_and_advance_by(CLOSE_STRING, 1);
@@ -216,7 +239,7 @@ int rjson(char* string, struct state* state) {
                 if (peek_at(0) == '0') {
                     push_string((char[]){peek_at(0)}, 1);
                     set_state_and_advance_by(EXPECT_FRACTION, 1);
-                } else if (strchr(digits19, peek_at(0)) != NULL) {
+                } else if (in(digits19, peek_at(0))) {
                     push_string((char[]){peek_at(0)}, 1);
                     set_state_and_advance_by(IN_NUMBER, 1);
                 } else {
@@ -226,7 +249,7 @@ int rjson(char* string, struct state* state) {
                 break;
             }
             case IN_NUMBER: {
-                if (strchr(digits, peek_at(0)) != NULL) {
+                if (in(digits, peek_at(0))) {
                     push_string((char[]){peek_at(0)}, 1);
                     set_state_and_advance_by(IN_NUMBER, 1);
                 } else {
@@ -257,7 +280,7 @@ int rjson(char* string, struct state* state) {
                 break;
             }
             case IN_FRACTION: {
-                if (strchr(digits, peek_at(0))) {
+                if (in(digits, peek_at(0))) {
                     push_string((char[]){peek_at(0)}, 1);
                     set_state_and_advance_by(IN_FRACTION_DIGIT, 1);
                 } else {
@@ -267,7 +290,7 @@ int rjson(char* string, struct state* state) {
                 break;
             }
             case IN_FRACTION_DIGIT: {
-                if (strchr(digits, peek_at(0))) {
+                if (in(digits, peek_at(0))) {
                     push_string((char[]){peek_at(0)}, 1);
                     set_state_and_advance_by(IN_FRACTION_DIGIT, 1);
                 } else {
@@ -287,7 +310,7 @@ int rjson(char* string, struct state* state) {
                 break;
             }
             case EXPECT_EXPONENT_DIGIT: {
-                if (strchr(digits, peek_at(0))) {
+                if (in(digits, peek_at(0))) {
                     push_string((char[]){peek_at(0)}, 1);
                     set_state_and_advance_by(IN_EXPONENT_DIGIT, 1);
                 } else {
@@ -297,7 +320,7 @@ int rjson(char* string, struct state* state) {
                 break;
             }
             case IN_EXPONENT_DIGIT: {
-                if (strchr(digits, peek_at(0))) {
+                if (in(digits, peek_at(0))) {
                     push_string((char[]) {peek_at(0)}, 1);
                     set_state_and_advance_by(IN_EXPONENT_DIGIT, 1);
                 } else {
@@ -326,7 +349,7 @@ int rjson(char* string, struct state* state) {
                 break;
             }
             case ASSOC_WHITESPACE_BEFORE_KEY: {
-                set_state_and_advance_by(EXPECT_VALUE, len_whitespace(string, state));
+                set_state_and_advance_by(ASSOC_EXPECT_KEY, len_whitespace(string, state));
 
                 break;
             }
@@ -382,7 +405,6 @@ int rjson(char* string, struct state* state) {
         }
 
         assert(to_inc != -999);
-        state->ordinal += to_inc;
     }
 #undef peek_at
 #undef set_state_and_advance_by
