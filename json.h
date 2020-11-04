@@ -1,9 +1,6 @@
 #ifndef JSON_JSON_H
 #define JSON_JSON_H
-#include<stdio.h>
 #include<stdlib.h>
-#include<stdbool.h>
-#include<string.h>
 
 
 char string_pool[0x8000];
@@ -14,7 +11,7 @@ struct token {
         ROOT,
         TRUE,
         FALSE,
-        JNULL,
+        JSON_NULL,
         STRING,
         NUMBER,
         ARRAY,
@@ -32,46 +29,11 @@ int token_cursor = 1;
  * Json doesn't require json arrays elements to have an order so sibling data is not stored
  */
 
-enum json_value_kind {
-    json_object,
-    json_array,
-    json_number,
-    json_string,
-    json_true,
-    json_false,
-    json_null
-};
 
 static int JSON_TRUE_SINGLETON;
 static int JSON_FALSE_SINGLETON;
 static int JSON_NULL_SINGLETON;
 
-
-struct json_value {
-    enum json_value_kind kind;
-    int parent;
-    size_t * address;
-};
-
-struct json_parsed {
-    int values_count;
-    struct json_value values[];
-};
-
-extern enum json_errors json_error;
-
-#define STRUCTURAL \
-  X(LEFT_SQUARE_BRACKET, '[') \
-  X(LEFT_CURLY_BRACKET, '{') \
-  X(RIGHT_SQUARE_BRACKET, ']') \
-  X(RIGHT_CURLY_BRACKET, '}') \
-  X(COLON, ':') \
-  X(COMMA, ',')
-
-#define LITERAL \
-  X(JSON_TRUE, "true") \
-  X(JSON_FALSE, "false") \
-  X(JSON_NULL, "null")
 
 #define WHITESPACE \
   X(TABULATION, '\t') \
@@ -106,23 +68,11 @@ extern enum json_errors json_error;
   X(JSON_ERROR_NO_SIBLINGS, "Only Arrays and Objects can have sibling descendants.")  \
 
 #define X(a, b) a,
-enum structural_tokens { STRUCTURAL };
-enum literal_name_tokens { LITERAL };
 enum whitespace_tokens { WHITESPACE };
 enum json_errors{ ERRORS };
 #undef X
 
 #define X(a, b) [a] = b,
-char structs[] = {
-    STRUCTURAL
-    '\0',
-};
-
-char * lits[] = {
-    LITERAL
-    NULL,
-};
-
 char whitespaces[] = {
     WHITESPACE
     '\0',
@@ -133,24 +83,14 @@ char * json_errors[] = {
 };
 #undef X
 
-#undef STRUCTURAL
-#undef LITERAL
 #undef WHITESPACE
 #undef ERRORS
 
 char digit_starters[] = "-0123456789";
 char digits[] = "0123456789";
 char digits19[] = "123456789";
-char digit_glyps[] = "-+0123456789.eE";
 
 enum states {
-#ifdef OLD_FORMAT
-    BEFORE_TOKEN,
-    AFTER_TOKEN,
-    PARSING_NULL,
-    PARSING_TRUE,
-    PARSING_FALSE,
-#endif
     WHITESPACE_BEFORE_VALUE,
     WHITESPACE_AFTER_VALUE,
     EXPECT_VALUE,
@@ -186,22 +126,8 @@ struct state {
     enum json_errors error;
 };
 
-int rjson(char*, struct state*);
-
-char *
- encode_json(struct json_parsed *json_parsed);
-struct json_parsed *
- decode_json(const char *str, size_t length);
-void
- free_json(struct json_parsed *json_parsed);
-void
- free_json_str(char * json_str);
-struct json_parsed *
- push_node(enum json_value_kind kind, int parent, size_t *address, struct json_parsed *json_parsed);
-bool
- json_semcheck(struct json_parsed *json_parsed);
-int
- json_parse_number(const char *str, size_t len);
+int rjson(char*, struct state*, void** );
 void print_debug(void);
+char * to_string(struct token[0x200], int);
 
 #endif //JSON_JSON_H

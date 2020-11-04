@@ -39,7 +39,7 @@ char * valid_json[] = {
     "false",
     "null",
     " \" a random string\"",
-    "[1, 2, \"azerty\", [1, 2], 4  ]  ",
+    "[1, 2, \"foo\", [1, 2], 4  ]  ",
     "[1, 2, 3]",
     "[1, \"2\", 3, \"\", \"\", \"foo\"]",
     "[1 , 2 , 3 ]",
@@ -92,7 +92,7 @@ char * valid_json[] = {
 };
 
 /* shouldn't be parsed as valid json */
-char * bogusjson[] = {
+char * bogus_json[] = {
     "",
     " ",
     "<!-- comment -->",
@@ -189,21 +189,23 @@ int main(void) {
 
     for (int i = 0; i < sizeof(valid_json) / sizeof(valid_json[0]) ; i++) {
         struct state state = {0};
-        rjson(valid_json[i], &state);
+        void * tokens__;
+        int res = rjson(valid_json[i], &state, &tokens__);
         printf("For >>> %s <<<, \n -> %s\n", valid_json[i], json_errors[state.error]);
-        print_debug();
+        puts(to_string(tokens__, res));
         fflush(stdout);
         assert(state.error == JSON_ERROR_NO_ERRORS);
     }
 
     puts("\n\n\n*** ALL SHOULD FAIL ***");
 
-    for (int i = 0; i < sizeof(bogusjson) / sizeof(bogusjson[0]) ; i++) {
+    for (int i = 0; i < sizeof(bogus_json) / sizeof(bogus_json[0]) ; i++) {
 
         struct state state = {0};
-        rjson(bogusjson[i], &state);
-        printf("For >>> %s <<<, \n -> %s\n", bogusjson[i], json_errors[state.error]);
-        print_debug();
+        void * tokens__;
+        int res = rjson(bogus_json[i], &state, &tokens__);
+        printf("For >>> %s <<<, \n -> %s\n", bogus_json[i], json_errors[state.error]);
+        puts(to_string(tokens__, res));
         fflush(stdout);
         assert(state.error != JSON_ERROR_NO_ERRORS);
     }

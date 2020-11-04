@@ -3,7 +3,10 @@
 //
 
 #include "json.h"
-#include "assert.h"
+#include<assert.h>
+#include<string.h>
+#include<stdio.h>
+#include<stdbool.h>
 
 size_t len_whitespace(char* string, struct state * state) {
     int count = 0;
@@ -46,9 +49,10 @@ static inline _Bool in(char* hay, char needle) {
 
 #define peek_at(where) string[state->ordinal + where]
 #define set_state_and_advance_by(which_, advance_) state->kind = which_; state->ordinal += advance_; to_inc = 0
-int rjson(char* string, struct state* state) {
+int rjson(char* string, struct state* state, void** tokens__) {
 
     size_t total_length = strlen(string);
+    *tokens__ = tokens;
 
     memcpy(tokens, (struct token [0x200]){(struct token) {.kind=ROOT}}, sizeof (struct token[0x200]));
     token_cursor = 1;
@@ -59,6 +63,7 @@ int rjson(char* string, struct state* state) {
     // todo: make fully reentrant
     // todo: make ANSI/STDC compatible
     // fixme: handle unicode literals
+    // fixme: output as string (stringify)
 
     if (state->ordinal == 0) {
         state->error = JSON_ERROR_NO_ERRORS;
@@ -90,7 +95,7 @@ int rjson(char* string, struct state* state) {
                     set_state_and_advance_by(WHITESPACE_AFTER_VALUE, strlen("false"));
                 }
                 else if (strncmp("null", string + state->ordinal, strlen("null")) == 0) {
-                    push_token(JNULL, &JSON_NULL_SINGLETON, root_index);
+                    push_token(JSON_NULL, &JSON_NULL_SINGLETON, root_index);
                     set_state_and_advance_by(WHITESPACE_AFTER_VALUE, strlen("null"));
                 }
                 else if (peek_at(0) == '"') {
@@ -129,7 +134,7 @@ int rjson(char* string, struct state* state) {
                     if (remaining(string, state)) {
                         state->error = JSON_ERROR_NO_SIBLINGS;
                     } else {
-                        return total_length;
+                        return token_cursor;
                     }
                 }
                 else if(tokens[root_index].kind == ARRAY) {
@@ -224,7 +229,6 @@ int rjson(char* string, struct state* state) {
 
                 break;
             }
-
             case START_NUMBER: {
                 if (peek_at(0) == '-') {
                     push_string((char[]){peek_at(0)}, 1);
@@ -414,14 +418,80 @@ int rjson(char* string, struct state* state) {
 void print_debug(void) {
     for (int j = 0; j < token_cursor; ++j) {
         printf("%d: kind: %s, root: %d", j, (char*[]){
-                "UNSET", "ROOT", "TRUE", "FALSE", "JNULL",
+                "UNSET", "ROOT", "TRUE", "FALSE", "JSON_NULL",
                 "STRING", "NUMBER", "ARRAY", "OBJECT", "OBJECT_KEY"
         }[tokens[j].kind],
                 tokens[j].root_index);
         if(tokens[j].kind == STRING || tokens[j].kind == NUMBER) {
-            printf(", value: %s", tokens[j].address);
+            char dest[*((char*)tokens[j].address-1) + 1];
+            dest[sizeof(dest) - 1] = '\0';
+            printf(", value: %s", memcpy(dest, tokens[j].address, *((char*)tokens[j].address-1)));
         }
         puts("");
     }
+}
 
+static char ident_s[0x80];
+static char * _print_ident(int ident) {
+    memset(ident_s, ' ', ident * 2);
+    ident_s[ident * 2] = '\0';
+
+    return ident_s;
+}
+
+
+char * to_string(struct token tokens_[0x200], int max) {
+    static char output[0x1600];
+    memset(output, 0, sizeof output);
+    int cursor = 0;
+    int ident = 0;
+    for (int j = 0; j < max; ++j) {
+        if (j && tokens_[tokens_[j].root_index].kind == STRING) {
+            cursor += sprintf(output + cursor, ": ");
+        } else {
+            cursor += sprintf(output + cursor, "%s", _print_ident(ident));
+        }
+
+        if (tokens_[j].kind == TRUE) cursor += sprintf(output + cursor, "true");
+        if (tokens_[j].kind == FALSE) cursor += sprintf(output + cursor, "false");
+        if (tokens_[j].kind == JSON_NULL) cursor += sprintf(output + cursor, "null");
+        if (tokens_[j].kind == STRING || tokens_[j].kind == NUMBER) {
+            char dest[*((char *) tokens_[j].address - 1) + 1];
+            dest[sizeof dest - 1] = '\0';
+            cursor += sprintf(
+                    output + cursor, (char *[]) {"\"%s\"", "%s"}[tokens_[j].kind == NUMBER],
+                    memcpy(dest, tokens_[j].address, *((char *) tokens_[j].address - 1))
+            );
+        }
+        if (tokens_[j].kind == ARRAY) cursor += sprintf(output + cursor, "[\n"), ident++;
+        if (tokens_[j].kind == OBJECT) cursor += sprintf(output + cursor, "{\n"), ident++;
+        if (j && j <= max) {
+            if (tokens_[j + 1].root_index < tokens_[j].root_index) {
+                if (j + 1 == max || tokens_[j + 1].root_index != tokens_[tokens_[j].root_index].root_index || tokens_[tokens_[j + 1].root_index].kind == ARRAY) {
+                    int target = tokens_[j + 1].root_index;
+                    int cur_node = j;
+                    while (true) {
+
+                        if(tokens_[tokens_[cur_node].root_index].kind == ARRAY) {
+                            cursor += sprintf(output + cursor, "\n%s]", _print_ident(--ident));
+                        }
+                        else if(tokens_[tokens_[cur_node].root_index].kind == OBJECT) {
+                            cursor += sprintf(output + cursor, "\n%s}", _print_ident(--ident));
+                        }
+                        if(tokens_[(cur_node = tokens_[cur_node].root_index)].root_index == target) {
+                            break;
+                        }
+
+                    }
+                }
+            }
+            if (j + 1 < max && (
+                tokens_[tokens_[j].root_index].kind == STRING || tokens_[tokens_[j].root_index].kind == ARRAY
+            ) && tokens_[j].kind != ARRAY && tokens_[j].kind != OBJECT) {
+                cursor += sprintf(output + cursor, ",\n");
+            }
+        }
+    }
+    snprintf(output + cursor, 1, "");
+    return output;
 }
