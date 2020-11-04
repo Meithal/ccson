@@ -8,4 +8,4 @@ add_library(njson SHARED json.h njson.c)
 
 add_executable(main main.c main.h)
 
-target_link_libraries(main json)
+target_link_libraries(main json njson)

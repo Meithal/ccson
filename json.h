@@ -9,7 +9,9 @@
 char string_pool[0x8000];
 size_t string_cursor = 1;
 struct token {
-    enum {
+    enum kind {
+        UNSET,
+        ROOT,
         TRUE,
         FALSE,
         JNULL,
@@ -17,25 +19,12 @@ struct token {
         NUMBER,
         ARRAY,
         OBJECT,
-        OBJECT_KEY,
-        OBJECT_VALUE
     } kind;
-    void * root;
+    int root_index;
     void * address;
 };
-struct token tokens[0x200];
-size_t token_cursor;
-
-static int root_singleton;
-void * roots[0x200] = {&root_singleton};
-size_t root_cursor;
-
-char arrays_pool[0x8000];
-size_t array_cursor;
-char assoc_pool[0x8000];
-size_t assoc_cursor;
-char assoc_keys_pool[0x8000];
-size_t assoc_keys_cursor;
+struct token tokens[0x200] = {(struct token) {.kind=ROOT}, (struct token) {.kind=UNSET}};
+int token_cursor = 1;
 
 /**
  * Json structures are stored as a flat array of objects holding
@@ -110,7 +99,10 @@ extern enum json_errors json_error;
   X(JSON_ERROR_NUMBER_WRONG_CHAR, "Rare case of an uncaught character in the exponent part of the number. Fixme.") \
   X(JSON_ERROR_INVALID_ESCAPE_SEQUENCE, "Invalid escape sequence.")                       \
   X(JSON_ERROR_INVALID_NUMBER, "Malformed number.")              \
-  X(JSON_ERROR_INVALID_CHARACTER_IN_ARRAY, "Invalid character in array.")
+  X(JSON_ERROR_INVALID_CHARACTER_IN_ARRAY, "Invalid character in array.") \
+  X(JSON_ERROR_ASSOC_EXPECT_STRING_A_KEY, "A JSON object key must be a quoted string.") \
+  X(JSON_ERROR_ASSOC_EXPECT_COLON, "Missing colon after object key.") \
+  X(JSON_ERROR_ASSOC_EXPECT_VALUE, "Missing value after JSON object key.")
 
 #define X(a, b) a,
 enum structural_tokens { STRUCTURAL };
@@ -180,6 +172,11 @@ enum states {
     ARRAY_AFTER_VALUE,
     ASSOC_AFTER_VALUE,
     ASSOC_WHITESPACE_BEFORE_KEY,
+    ASSOC_EXPECT_KEY,
+    ASSOC_AFTER_KEY_WHITESPACE,
+    CLOSE_STRING,
+    ASSOC_EXPECT_COLON,
+    ASSOC_AFTER_INNER_VALUE
 };
 
 struct state {
@@ -204,8 +201,6 @@ bool
  json_semcheck(struct json_parsed *json_parsed);
 int
  json_parse_number(const char *str, size_t len);
-
-struct json_parsed *
- ndecode_json(const char *str, unsigned int length);
+void print_debug(void);
 
 #endif //JSON_JSON_H

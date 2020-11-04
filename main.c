@@ -1,6 +1,6 @@
 #include "main.h"
 #include "json.h"
-#include <stdalign.h>
+#include <assert.h>
 
 char * valid_json[] = {
     "true",
@@ -39,10 +39,17 @@ char * valid_json[] = {
     "false",
     "null",
     " \" a random string\"",
-    " \" a random string with \\u0000 correctly encoded null byte\"",
+    "[1, 2, \"azerty\", [1, 2], 4  ]  ",
+    "[1, 2, 3]",
+    "[1, \"2\", 3, \"\", \"\", \"foo\"]",
+    "[1 , 2 , 3 ]",
+    "[1, 2, 3  ]",
+    "[1, 2, 3  ]  ",
+//    " \" a random string with \\u0000 correctly encoded null byte\"",
     "{\r\n\t "
         "\"foo\": \"bar\""
     "}",
+    "{\"foo\": 1, \"bar\": \"foo\"}",
     "[1, 2, \"foo\", true]",
     "{"
         "    \"Image\": {"
@@ -50,7 +57,7 @@ char * valid_json[] = {
             "\"Height\": 600,"
             "\"Title\":  \"View from 15th Floor\","
             "\"Thumbnail\":"
-            "\"Url\":    {\"http://www.example.com/image/481989943\","
+                "{\"Url\": \"http://www.example.com/image/481989943\","
                 "              \"Height\": 125,"
                 "\"Width\":  \"100\""
             "},"
@@ -104,9 +111,10 @@ char * bogusjson[] = {
     "\"forget closing quote",
     "\"too many quotes\"\"",
     "'wrong quote'",
+    "\"incomplete \\u122 unicode\"",
     "\"characters between 00 and 1F must use the unicode codepoint notation, \\u0000, not \1, \2, \0 .\"",
     "\"true and\" false",
-    "0123", /* leading zeros are forbidden */
+    "0123",
     "123 345",
     "+0",
     "+1",
@@ -162,31 +170,53 @@ char * bogusjson[] = {
     "12,3.4e23,",
     "123.4e,23,",
     "123.4e2,3,",
+    "{true: 1}",
+    "{false: 1}",
+    "{null: 1}",
+    "{2: 1}",
+    "{[true]: 1}",
+    "{{}: 1}",
+    "{[]: 1}",
+    "{\"test\"}",
+    "{\"test\":}",
 };
 
 int main(int argc, char * argv[], char* env[]) {
     for (int i = 0; i < sizeof(valid_json) / sizeof(valid_json[0]) ; i++) {
-        json_error = JSON_ERROR_NO_ERRORS;
-        struct json_parsed * json_parsed = decode_json(valid_json[i], strlen(valid_json[i]));
-        printf("%s", encode_json(json_parsed));
-
-        free_json(json_parsed);
-
-        printf("For >>> %s <<<, \n -> %s\n", valid_json[i], json_errors[json_error]);
+//        json_error = JSON_ERROR_NO_ERRORS;
+//        struct json_parsed * json_parsed = decode_json(valid_json[i], strlen(valid_json[i]));
+//        printf("%s", encode_json(json_parsed));
+//
+//        free_json(json_parsed);
+//
+//        printf("For >>> %s <<<, \n -> %s\n", valid_json[i], json_errors[json_error]);
+        struct state state = {0};
+        rjson(valid_json[i], &state);
+        printf("For >>> %s <<<, \n -> %s\n", valid_json[i], json_errors[state.error]);
+        print_debug();
+        fflush(stdout);
+        assert(state.error == JSON_ERROR_NO_ERRORS);
     }
 
     puts("\n\n\n*** ALL SHOULD FAIL ***");
-
+//
     for (int i = 0; i < sizeof(bogusjson) / sizeof(bogusjson[0]) ; i++) {
-        json_error = JSON_ERROR_NO_ERRORS;
-        struct json_parsed * json_parsed = decode_json(bogusjson[i], strlen(bogusjson[i]));
-        printf("%s", encode_json(json_parsed));
-        free_json(json_parsed);
+//        json_error = JSON_ERROR_NO_ERRORS;
+//        struct json_parsed * json_parsed = decode_json(bogusjson[i], strlen(bogusjson[i]));
+//        printf("%s", encode_json(json_parsed));
+//        free_json(json_parsed);
+//
+//        printf("For >>> %s <<<, \n -> %s\n", bogusjson[i], json_errors[json_error]);
+        struct state state = {0};
+        rjson(bogusjson[i], &state);
+        printf("For >>> %s <<<, \n -> %s\n", bogusjson[i], json_errors[state.error]);
+        print_debug();
+        fflush(stdout);
+        assert(state.error != JSON_ERROR_NO_ERRORS);
 
-        printf("For >>> %s <<<, \n -> %s\n", bogusjson[i], json_errors[json_error]);
     }
-
-    rjson("12", &(struct state){0});
+//
+//    rjson("12", &(struct state){0});
     (void)getchar();
     return 0;
 }
