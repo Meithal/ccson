@@ -107,4 +107,4 @@ Doesn't support extended ASCII. Doesn't support UTF16 nor UTF32.
 
 
 ## Bugs
-Report them on
+Report them on https://gitlab.com/Meithal/json/-/issues
