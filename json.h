@@ -173,7 +173,7 @@ struct state {
 };
 
 EXPORT int rjson(unsigned char*, size_t len, struct state*);
-void print_debug(struct state * state);
-char * to_string(struct token[0x200], int);
+EXPORT void print_debug(struct state * state);
+EXPORT char * to_string(struct token[0x200], int);
 
 #endif //JSON_JSON_H

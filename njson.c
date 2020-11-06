@@ -52,9 +52,7 @@ EXPORT int rjson(unsigned char* string, size_t len, struct state* state) {
     }
     memset(*state->tokens_stack, 0, sizeof *state->tokens_stack);
     push_token(ROOT, NULL, state);
-    state->token_cursor = 1;
     memset(*state->string_pool, 0, sizeof *state->string_pool);
-    state->string_cursor = 0;
 
     // todo: make fully reentrant
     // todo: make ANSI/STDC compatible
@@ -464,8 +462,7 @@ EXPORT int rjson(unsigned char* string, size_t len, struct state* state) {
 #undef set_state_and_advance_by
 }
 
-#ifdef HAS_VLA
-void print_debug(struct state * state) {
+EXPORT void print_debug(struct state * state) {
     int j;
     for (j = 0; j < state->token_cursor; ++j) {
         printf("%d: kind: %s, root: %d", j, (char*[]){
@@ -474,10 +471,9 @@ void print_debug(struct state * state) {
         }[(*state->tokens_stack)[j].kind],
                 (*state->tokens_stack)[j].root_index);
         if((*state->tokens_stack)[j].kind == STRING || (*state->tokens_stack)[j].kind == NUMBER) {
-            char dest[*((char*)(*state->tokens_stack)[j].address) + 1];
-            dest[sizeof(dest) - 1] = '\0';
+            char dest[STRING_POOL_SIZE] = {0};
             printf(", value: %s",
-                   memcpy(dest, ((*state->tokens_stack)[j].address)+1, *((char*)(*state->tokens_stack)[j].address))
+                   memcpy(dest, (char*)((*state->tokens_stack)[j].address)+1, *((char*)(*state->tokens_stack)[j].address))
                    );
         }
         puts("");
@@ -493,9 +489,11 @@ static char * print_ident(int ident) {
 }
 
 
-char * to_string(struct token tokens_[0x200], int max) {
+EXPORT char * to_string(struct token tokens_[0x200], int max) {
     // todo: make the caller handle the buffer
     // todo: remove VLAs
+
+    struct token *tokens = tokens_;
 
     static char output[0x1600];
     memset(output, 0, sizeof output);
@@ -503,49 +501,48 @@ char * to_string(struct token tokens_[0x200], int max) {
     int ident = 0;
     int j;
     for (j = 1; j < max; ++j) {
-        if (tokens_[tokens_[j].root_index].kind == STRING) {
+        if (tokens[tokens[j].root_index].kind == STRING) {
             cursor += sprintf(output + cursor, ": ");
         } else {
             cursor += sprintf(output + cursor, "%s", print_ident(ident));
         }
 
-        if (tokens_[j].kind == TRUE) cursor += sprintf(output + cursor, "true");
-        if (tokens_[j].kind == FALSE) cursor += sprintf(output + cursor, "false");
-        if (tokens_[j].kind == JSON_NULL) cursor += sprintf(output + cursor, "null");
-        if (tokens_[j].kind == STRING || tokens_[j].kind == NUMBER) {
-            char dest[*((char *) tokens_[j].address - 1) + 1];
-            dest[sizeof dest - 1] = '\0';
+        if (tokens[j].kind == TRUE) cursor += sprintf(output + cursor, "true");
+        if (tokens[j].kind == FALSE) cursor += sprintf(output + cursor, "false");
+        if (tokens[j].kind == JSON_NULL) cursor += sprintf(output + cursor, "null");
+        if (tokens[j].kind == STRING || tokens[j].kind == NUMBER) {
+            char dest[STRING_POOL_SIZE] = {0};
             cursor += sprintf(
-                    output + cursor, (char *[]) {"\"%s\"", "%s"}[tokens_[j].kind == NUMBER],
-                    memcpy(dest, tokens_[j].address, *((char *) tokens_[j].address - 1))
+                    output + cursor, (char *[]) {"\"%s\"", "%s"}[tokens[j].kind == NUMBER],
+                    memcpy(dest, (char*)tokens[j].address+1, *((char *) tokens[j].address))
             );
         }
-        if (tokens_[j].kind == ARRAY) cursor += sprintf(output + cursor, "[\n"), ident++;
-        if (tokens_[j].kind == OBJECT) cursor += sprintf(output + cursor, "{\n"), ident++;
+        if (tokens[j].kind == ARRAY) cursor += sprintf(output + cursor, "[\n"), ident++;
+        if (tokens[j].kind == OBJECT) cursor += sprintf(output + cursor, "{\n"), ident++;
         if (j <= max) {
-            if (tokens_[j + 1].root_index < tokens_[j].root_index) {
+            if (tokens[j + 1].root_index < tokens[j].root_index) {
                 if (j + 1 == max
-                || tokens_[j + 1].root_index != tokens_[tokens_[j].root_index].root_index
-                || tokens_[tokens_[j + 1].root_index].kind == ARRAY) {
-                    int target = tokens_[j + 1].root_index;
+                || tokens[j + 1].root_index != tokens[tokens[j].root_index].root_index
+                || tokens[tokens[j + 1].root_index].kind == ARRAY) {
+                    int target = tokens[j + 1].root_index;
                     int cur_node = j;
                     for (;;) {
 
-                        if(tokens_[tokens_[cur_node].root_index].kind == ARRAY) {
+                        if(tokens[tokens[cur_node].root_index].kind == ARRAY) {
                             cursor += sprintf(output + cursor, "\n%s]", print_ident(--ident));
                         }
-                        else if(tokens_[tokens_[cur_node].root_index].kind == OBJECT) {
+                        else if(tokens[tokens[cur_node].root_index].kind == OBJECT) {
                             cursor += sprintf(output + cursor, "\n%s}", print_ident(--ident));
                         }
-                        if(tokens_[(cur_node = tokens_[cur_node].root_index)].root_index == target) {
+                        if(tokens[(cur_node = tokens[cur_node].root_index)].root_index == target) {
                             break;
                         }
                     }
                 }
             }
             if (j + 1 < max && (
-                tokens_[tokens_[j].root_index].kind == STRING || tokens_[tokens_[j].root_index].kind == ARRAY
-            ) && tokens_[j].kind != ARRAY && tokens_[j].kind != OBJECT) {
+                tokens[tokens[j].root_index].kind == STRING || tokens[tokens[j].root_index].kind == ARRAY
+            ) && tokens[j].kind != ARRAY && tokens[j].kind != OBJECT) {
                 cursor += sprintf(output + cursor, ",\n");
             }
         }
@@ -553,4 +550,3 @@ char * to_string(struct token tokens_[0x200], int max) {
     snprintf(output + cursor, 1, "");
     return output;
 }
-#endif // HAS_VLA
