@@ -23,7 +23,6 @@ EXPORT void start_string(struct state * state) {
 }
 
 EXPORT void push_string(struct state* state, char* string, int length) {
-    assert(length > 0);
     memcpy(*(state->string_pool) + state->string_cursor + 1 + (*state->string_pool)[state->string_cursor], string, length);
     (*state->string_pool)[state->string_cursor] += length;
 }
@@ -43,7 +42,7 @@ EXPORT void push_token(enum kind kind, void * address, struct state * state) {
 EXPORT int rjson(unsigned char* string, size_t len, struct state* state) {
 
 #define peek_at(where) string[state->ordinal + where]
-#define set_state_and_advance_by(which_, advance_) state->kind = which_; state->ordinal += advance_; to_inc = 0
+#define set_state_and_advance_by(which_, advance_) state->kind = which_; state->ordinal += advance_
     if (state->tokens_stack == NULL) {
         state->tokens_stack = &tokens__;
     }
@@ -65,8 +64,6 @@ EXPORT int rjson(unsigned char* string, size_t len, struct state* state) {
     }
 
     for(;;) {
-
-        int to_inc = -999;
         switch (state->kind) {
             case WHITESPACE_BEFORE_VALUE: {
                 set_state_and_advance_by(EXPECT_VALUE, len_whitespace(string, state));
@@ -143,8 +140,6 @@ EXPORT int rjson(unsigned char* string, size_t len, struct state* state) {
                 }
                 else if((*state->tokens_stack)[state->root_index].kind == STRING) {
                     set_state_and_advance_by(ASSOC_AFTER_INNER_VALUE, 0);
-                } else {
-                    assert(0);
                 }
 
                 break;
@@ -455,8 +450,6 @@ EXPORT int rjson(unsigned char* string, size_t len, struct state* state) {
         if(state->error != JSON_ERROR_NO_ERRORS) {
             return state->token_cursor;
         }
-
-        assert(to_inc != -999);
     }
 #undef peek_at
 #undef set_state_and_advance_by
@@ -473,7 +466,7 @@ EXPORT void print_debug(struct state * state) {
         if((*state->tokens_stack)[j].kind == STRING || (*state->tokens_stack)[j].kind == NUMBER) {
             char dest[STRING_POOL_SIZE] = {0};
             printf(", value: %s",
-                   memcpy(dest, (char*)((*state->tokens_stack)[j].address)+1, *((char*)(*state->tokens_stack)[j].address))
+                   (char*)memcpy(dest, (char*)((*state->tokens_stack)[j].address)+1, *((char*)(*state->tokens_stack)[j].address))
                    );
         }
         puts("");
@@ -491,7 +484,6 @@ static char * print_ident(int ident) {
 
 EXPORT char * to_string(struct token tokens_[0x200], int max) {
     // todo: make the caller handle the buffer
-    // todo: remove VLAs
 
     struct token *tokens = tokens_;
 

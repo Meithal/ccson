@@ -19,7 +19,7 @@ if(SELF_MANAGE_MEMORY)
     add_compile_definitions("SELF_MANAGE_MEMORY")
 
 else()
-    set(STRING_POOL_SIZE  0x8000 CACHE STRING "Size of the string pool.")
+    set(STRING_POOL_SIZE  0x2000 CACHE STRING "Size of the string pool.")
     set(MAX_TOKENS        0x200  CACHE STRING "Max number of tokens the parser can store.")
     add_compile_definitions("STRING_POOL_SIZE=$CACHE{STRING_POOL_SIZE}")
     add_compile_definitions("MAX_TOKENS=$CACHE{MAX_TOKENS}")

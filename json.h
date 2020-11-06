@@ -1,7 +1,6 @@
 #ifndef JSON_JSON_H
 #define JSON_JSON_H
 #include<stdlib.h>
-#include<assert.h>
 #include<string.h>
 #include<stdio.h>
 
@@ -47,7 +46,7 @@ unsigned char string_pool__[STRING_POOL_SIZE];
 struct token tokens__[MAX_TOKENS] = {{.kind=UNSET}};
 #endif
 #ifndef STRING_POOL_SIZE
-#define STRING_POOL_SIZE 0x8000
+#define STRING_POOL_SIZE 0x2000
 #endif
 #ifndef MAX_TOKENS
 #define MAX_TOKENS 0x200
@@ -172,8 +171,17 @@ struct state {
 #endif
 };
 
+/* Parsing */
 EXPORT int rjson(unsigned char*, size_t len, struct state*);
+/* Output */
 EXPORT void print_debug(struct state * state);
 EXPORT char * to_string(struct token[0x200], int);
+/* Building */
+EXPORT void start_string(struct state * state);
+EXPORT void push_string(struct state* state, char* string, int length);
+EXPORT void close_root(struct state * state);
+EXPORT void push_root(struct state * state);
+EXPORT void push_token(enum kind kind, void * address, struct state * state);
+/* __/ */
 
 #endif //JSON_JSON_H

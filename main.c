@@ -268,5 +268,37 @@ int main(void) {
     }
 #endif
 
+    /* "[1, 2, \"foo\", [1, 2], 4  ]  ", */
+    puts("\n\n\n*** EX NIHILO ***");
+    struct state state = {
+        .tokens_stack = &(struct token[MAX_TOKENS]) {0},
+        .string_pool = &(unsigned char [STRING_POOL_SIZE]) {0}
+    };
+    push_token(ROOT, NULL, &state);
+    push_token(ARRAY, NULL, &state);
+    push_root(&state);
+    start_string(&state);
+    push_string(&state, "1", 1);
+    push_token(NUMBER, *state.string_pool + state.string_cursor, &state);
+    start_string(&state);
+    push_string(&state, "2", 1);
+    push_token(NUMBER, *state.string_pool + state.string_cursor, &state);
+    start_string(&state);
+    push_string(&state, "foo", 3);
+    push_token(STRING, *state.string_pool + state.string_cursor, &state);
+    push_token(ARRAY, NULL, &state);
+    push_root(&state);
+    start_string(&state);
+    push_string(&state, "1", 1);
+    push_token(NUMBER, *state.string_pool + state.string_cursor, &state);
+    start_string(&state);
+    push_string(&state, "2", 1);
+    push_token(NUMBER, *state.string_pool + state.string_cursor, &state);
+    close_root(&state);
+    start_string(&state);
+    push_string(&state, "4", 1);
+    push_token(NUMBER, *state.string_pool + state.string_cursor, &state);
+
+    puts(to_string(*(state.tokens_stack), state.token_cursor));
     return 0;
 }
