@@ -57,6 +57,7 @@ EXPORT int rjson(unsigned char* string, size_t len, struct state* state) {
     // fixme: less verbose
     // fixme: less arguments
     // fixme: complete example with self managed memory.
+    // fixme: extended ascii
     // todo: make fully reentrant
     // todo: make ANSI/STDC compatible
     // todo: make libc optional

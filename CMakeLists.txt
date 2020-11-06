@@ -14,7 +14,7 @@ if(WANT_JSON1)
     add_compile_definitions("WANT_JSON1")
 endif()
 
-option(SELF_MANAGE_MEMORY "Manage work memory yourself." OFF)
+option(SELF_MANAGE_MEMORY "Manage memory yourself." OFF)
 
 if(SELF_MANAGE_MEMORY)
     add_compile_definitions("SELF_MANAGE_MEMORY")

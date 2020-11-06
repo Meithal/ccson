@@ -69,18 +69,6 @@ struct token tokens__[MAX_TOKENS] = {{.kind=UNSET}};
   X(JSON_ERROR_JSON_TOO_SHORT, "End of JSON before we could parse any meaningful token.") \
   X(JSON_ERROR_TWO_OBJECTS_HAVE_SAME_PARENT, "Two values have the same parent.") \
   X(JSON_ERROR_EMPTY, "A JSON document can't be empty.") \
-  X(JSON_ERROR_LEADING_PLUS, "A JSON number can't have a leading + sign.") \
-  X(JSON_ERROR_WRONG_MINUS, "Found a minus sign in a JSON number in the wrong place.") \
-  X(JSON_ERROR_TOO_MANY_EXPONENTS, "Found an exponent marker in a number already having one.") \
-  X(JSON_ERROR_WRONG_POST_EXP, "After an exponent symbol, we expect either a +, -, or 0-9.") \
-  X(JSON_ERROR_EXP_EMPTY, "The exponent part of a number can't be empty.") \
-  X(JSON_ERROR_EXP_NO_DIGIT, "The exponent part of a number must have at least one digit.") \
-  X(JSON_ERROR_NO_LEADING_DIGIT, "The leading part of a JSON number must have at least one digit.") \
-  X(JSON_ERROR_WRONG_POST_MINUS, "After a leading minus, we expect a digit.") \
-  X(JSON_ERROR_MUST_FIND_DOT_OR_EXP, "After a leading zero, we can only find a dot or an exponent.") \
-  X(JSON_ERROR_TOO_MANY_DOTS, "Found a dot too many.") \
-  X(JSON_ERROR_MUST_HAVE_DIGIT_AFTER_DOT, "After a decimal dot, we must have at least one digit.") \
-  X(JSON_ERROR_NUMBER_WRONG_CHAR, "Rare case of an uncaught character in the exponent part of the number. Fixme.") \
   X(JSON_ERROR_INVALID_ESCAPE_SEQUENCE, "Invalid escape sequence.")                       \
   X(JSON_ERROR_INVALID_NUMBER, "Malformed number.")              \
   X(JSON_ERROR_INVALID_CHARACTER_IN_ARRAY, "Invalid character in array.") \

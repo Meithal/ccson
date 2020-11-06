@@ -39,9 +39,10 @@ int main(void) {
 
 
 ## Sturdy
-Parsing doesn't involve recursion so no risk of stack busting 
-from untrusted input. Covered by almost 200 tests (for both valid 
-and invalid cases). Doesn't use dynamic memory.
+Parsing is single pass and doesn't involve recursion so no risk of 
+stack busting from untrusted input. 
+Covered by almost 200 tests (for both valid and invalid cases). 
+Doesn't use dynamic memory.
 By default uses a small pool of static memory that should 
 cover most use cases. The size can be customized or disabled completely 
 if you want to supply it your own buffers (from eg. malloc).
@@ -55,7 +56,7 @@ in JSON documents, the size of strings is stored apart. The numbers are also
 ## Minimal footprint
 Written in ANSI C (tests and stringifier are in C99). 
 Compiles by default into a shared library (DLL, .so). Can be used 
-header only, no LibC, thread-safe. Should be cross platform
+header only, no LibC (yet), thread-safe. Should be cross platform
 (not tested).
 
 On failure the parser returns the number of successfully parsed tokens
@@ -66,7 +67,6 @@ before trying again.
 ## Reentrant
 You can produce a json document over the course of several days
 and be able to probe it and store it as it is being produced, without errors.
-Usually an incomplete JSON document will cause an error.
 
 This makes it easy to work with a sliding window in a limited memory
 environment.
@@ -88,11 +88,11 @@ If you maintain an external hashmap of fully qualified identifiers
  (with a scripting language for example) you can get 
  O(1) accesses in every case. However fundamentally JSON doesn't 
  require object keys to be unique so a query with a fqn doesn't 
- make a lot of sense in JSON context.
+ make a lot of sense.
 
 This library does a full copy of strings and numbers.
 This makes reentry easier as you can clear the original buffer
-between subsequent passes, in cost of some speed. 
+between passes, in cost of some speed. 
 It will also convert control characters in their escaped 
 unicode form (`\0` becomes `\\u0000`, `\1` becomes `\\u0001`, etc.).
 
