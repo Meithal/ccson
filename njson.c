@@ -1,6 +1,6 @@
 #include "json.h"
 
-int static len_whitespace(char* string, struct state * state) {
+int static len_whitespace(unsigned char* string, struct state * state) {
     int count = 0;
     while(string[state->ordinal + count] != '\0' && strchr(whitespaces, string[state->ordinal + count]) != NULL) {
         count++;
@@ -8,14 +8,14 @@ int static len_whitespace(char* string, struct state * state) {
     return count;
 }
 
-void static start_string() {
-    string_cursor += (int)string_pool[string_cursor-1] + 1;
+void static start_string(struct state * state) {
+    state->string_cursor += (int)string_pool[state->string_cursor-1] + 1;
 }
 
-void static push_string(char* string, int length) {
+void static push_string(struct state* state, unsigned char* string, int length) {
     assert(length > 0);
-    memcpy(string_pool + string_cursor + string_pool[string_cursor-1], string, length);
-    string_pool[string_cursor-1] += length;
+    memcpy(string_pool + state->string_cursor + string_pool[state->string_cursor-1], string, length);
+    string_pool[state->string_cursor-1] += length;
 }
 
 void static close_root(struct state * state) {
@@ -30,8 +30,8 @@ void static push_token(enum kind kind, void * address, struct state * state) {
     tokens[state->token_cursor++] = (struct token) {.kind=kind, .root_index=state->root_index, .address=address};
 }
 
-static inline size_t remaining(char * string, struct state* state) {
-    return strlen(string + state->ordinal);
+static inline size_t remaining(int max, struct state* state) {
+    return max - state->ordinal;
 }
 
 static inline int in(char* hay, char needle) {
@@ -39,7 +39,7 @@ static inline int in(char* hay, char needle) {
 }
 
 
-EXPORT int rjson(char* string, struct state* state, void** tokens__) {
+EXPORT int rjson(unsigned char* string, size_t len, struct state* state, void** tokens__) {
 
 #define peek_at(where) string[state->ordinal + where]
 #define set_state_and_advance_by(which_, advance_) state->kind = which_; state->ordinal += advance_; to_inc = 0
@@ -49,14 +49,14 @@ EXPORT int rjson(char* string, struct state* state, void** tokens__) {
     memcpy(tokens, (struct token [0x200]){(struct token) {.kind=ROOT}}, sizeof (struct token[0x200]));
     state->token_cursor = 1;
     memset(string_pool, 0, sizeof string_pool);
-    string_cursor = 0;
+    state->string_cursor = 0;
 
     // todo: make fully reentrant
     // todo: make ANSI/STDC compatible
-    // fixme: handle unicode literals
     // todo: make libc optional
     // fixme: longer than 64 bytes strings
     // fixme: create tree from nothing
+    // todo: complete unicode support?
 
     if (state->ordinal == 0) {
         state->error = JSON_ERROR_NO_ERRORS;
@@ -79,20 +79,20 @@ EXPORT int rjson(char* string, struct state* state, void** tokens__) {
 
             case EXPECT_VALUE:
             {
-                if (strncmp("true", string + state->ordinal, strlen("true")) == 0) {
+                if (strncmp("true", (char*)string + state->ordinal, strlen("true")) == 0) {
                     push_token(TRUE, NULL, state);
                     set_state_and_advance_by(WHITESPACE_AFTER_VALUE, strlen("true"));
                 }
-                else if (strncmp("false", string + state->ordinal, strlen("false")) == 0) {
+                else if (strncmp("false", (char*)string + state->ordinal, strlen("false")) == 0) {
                     push_token(FALSE, NULL, state);
                     set_state_and_advance_by(WHITESPACE_AFTER_VALUE, strlen("false"));
                 }
-                else if (strncmp("null", string + state->ordinal, strlen("null")) == 0) {
+                else if (strncmp("null", (char *)string + state->ordinal, strlen("null")) == 0) {
                     push_token(JSON_NULL, NULL, state);
                     set_state_and_advance_by(WHITESPACE_AFTER_VALUE, strlen("null"));
                 }
                 else if (peek_at(0) == '"') {
-                    start_string();
+                    start_string(state);
                     set_state_and_advance_by(FOUND_OPEN_QUOTE, 1);
                 }
                 else if (peek_at(0) == '[') {
@@ -106,13 +106,13 @@ EXPORT int rjson(char* string, struct state* state, void** tokens__) {
                     set_state_and_advance_by(OPEN_ASSOC, 1);
                 }
                 else if (in(digit_starters, peek_at(0))) {
-                    start_string();
+                    start_string(state);
                     set_state_and_advance_by(START_NUMBER, 0);
                 }
                 else if (tokens[state->root_index].kind != ROOT) {
                     state->error = JSON_ERROR_ASSOC_EXPECT_VALUE;
                 }
-                else if (remaining(string+len_whitespace(string, state), state)) {
+                else if (remaining(len, state)) {
                     state->error = JSON_ERROR_INVALID_CHARACTER;
                 }
                 else {
@@ -124,7 +124,7 @@ EXPORT int rjson(char* string, struct state* state, void** tokens__) {
             case AFTER_VALUE:
             {
                 if (tokens[state->root_index].kind == ROOT) {
-                    if (remaining(string, state)) {
+                    if (remaining(len, state)) {
                         state->error = JSON_ERROR_NO_SIBLINGS;
 #ifdef WANT_JSON1
                     } else if(state->mode == JSON1 && tokens[state->token_cursor-1].kind != OBJECT) {
@@ -179,29 +179,44 @@ EXPORT int rjson(char* string, struct state* state, void** tokens__) {
             }
             case LITERAL_ESCAPE: {
                 if (peek_at(0) == '\\') {
-                    push_string("\\", 1);
+                    push_string(state, (unsigned char*)"\\\\", 2);
                 }
                 else if (peek_at(0) == '"') {
-                    push_string("\"", 1);
+                    push_string(state, (unsigned char*)"\\\"", 2);
                 }
                 else if (peek_at(0) == '/') {
-                    push_string("/", 1);
+                    push_string(state, (unsigned char*)"\\/", 2);
                 }
                 else if (peek_at(0) == 'b') {
-                    push_string("\b", 1);
+                    push_string(state, (unsigned char*)"\\b", 2);
                 }
                 else if (peek_at(0) == 'f') {
-                    push_string("\f", 1);
+                    push_string(state, (unsigned char*)"\\f", 2);
                 }
                 else if (peek_at(0) == 'n') {
-                    push_string("\n", 1);
+                    push_string(state, (unsigned char*)"\\n", 2);
                 }
                 else if (peek_at(0) == 'r') {
-                    push_string("\r", 1);
+                    push_string(state, (unsigned char*)"\\r", 2);
                 }
                 else if (peek_at(0) == 't') {
-                    push_string("\t", 1);
-                } else {
+                    push_string(state, (unsigned char*)"\\t", 2);
+                }
+                else if (peek_at(0) == 'u') {
+                    if(!(in(hexdigits, peek_at(1))
+                    && in(hexdigits, peek_at(2))
+                    && in(hexdigits, peek_at(3))
+                    && in(hexdigits, peek_at(4)))
+                    ) {
+                        state->error = JSON_ERROR_INCOMPLETE_UNICODE_ESCAPE;
+                        break;
+                    }
+                    push_string(state, (unsigned char*)"\\u", 2);
+                    push_string(state, string+state->ordinal+1, 4);
+                    set_state_and_advance_by(IN_STRING, 5);
+                    break;
+                }
+                else {
                     state->error = JSON_ERROR_INVALID_ESCAPE_SEQUENCE;
                 }
                 set_state_and_advance_by(IN_STRING, 1);
@@ -209,23 +224,53 @@ EXPORT int rjson(char* string, struct state* state, void** tokens__) {
                 break;
             }
             case IN_STRING: {
-                if (!remaining(string + len_whitespace(string, state), state)) {
+                if (!remaining(len, state))
+                {
                     state->error = JSON_ERROR_JSON_TOO_SHORT;
                 }
-                else if (peek_at(0) == '\\') {
+                else if (peek_at(0) == '\\')
+                {
                     set_state_and_advance_by(LITERAL_ESCAPE, 1);
-                } else if (peek_at(0) == '"') {
+                }
+                else if (peek_at(0) == '"')
+                {
                     set_state_and_advance_by(CLOSE_STRING, 1);
-                } else {
-                    push_string((char[]){peek_at(0)}, 1);
+                }
+                else if(peek_at(0) < ' ')
+                { /* todo: shortcuts for \b, \t, \n, ... */
+                    push_string(state, (unsigned char*)"\\u00", 4);
+                    push_string(state, (unsigned char[2]){num_to_hex[peek_at(0)/16], num_to_hex[peek_at(0)%16]}, 2);
                     set_state_and_advance_by(IN_STRING, 1);
+                }
+//                else if(peek_at(0) > 0xffff) { /* In UTF16 realm */
+//                    push_string(state, "\\u00", 4);
+//                    push_string(state, (char[]){num_to_hex[peek_at(0)/16], num_to_hex[peek_at(0)%16]}, 2);
+//                    set_state_and_advance_by(IN_STRING, 1);
+//                }
+                else if(peek_at(0) > 0xFF / 2) { /* In extended ASCII */
+                    if((peek_at(0) & 0xe0u) == 0xe0) { /* 3 highest bits are set */
+                        state->error = JSON_ERROR_UTF16_NOT_SUPPORTED_YET;
+                        break;
+                    }
+                    push_string(state, (unsigned char*)"\\u00", 4);
+                    unsigned char decoded = (string[state->ordinal]&0x1Fu<<5u)|(string[state->ordinal+1]&0x7Fu);
+                    push_string(state, (unsigned char[2]){num_to_hex[decoded/16], num_to_hex[decoded%16]}, 2);
+                    set_state_and_advance_by(IN_STRING, 2);
+                }
+                else {
+                    push_string(state, (unsigned char[]){peek_at(0)}, 1);
+                    set_state_and_advance_by(IN_STRING, 1);
+                }
+
+                if(state->ordinal >= 2 && ((peek_at(-2) & 0xe0u) == 0xe0)) {
+                    state->error = JSON_ERROR_UTF16_NOT_SUPPORTED_YET;
                 }
 
                 break;
             }
             case START_NUMBER: {
                 if (peek_at(0) == '-') {
-                    push_string((char[]){peek_at(0)}, 1);
+                    push_string(state, (unsigned char[]){peek_at(0)}, 1);
                     set_state_and_advance_by(NUMBER_AFTER_MINUS, 1);
                 } else {
                     set_state_and_advance_by(NUMBER_AFTER_MINUS, 0);
@@ -236,10 +281,10 @@ EXPORT int rjson(char* string, struct state* state, void** tokens__) {
             case NUMBER_AFTER_MINUS:
             {
                 if (peek_at(0) == '0') {
-                    push_string((char[]){peek_at(0)}, 1);
+                    push_string(state, (unsigned char[]){peek_at(0)}, 1);
                     set_state_and_advance_by(EXPECT_FRACTION, 1);
                 } else if (in(digits19, peek_at(0))) {
-                    push_string((char[]){peek_at(0)}, 1);
+                    push_string(state, (unsigned char[]){peek_at(0)}, 1);
                     set_state_and_advance_by(IN_NUMBER, 1);
                 } else {
                     state->error = JSON_ERROR_INVALID_NUMBER;
@@ -249,7 +294,7 @@ EXPORT int rjson(char* string, struct state* state, void** tokens__) {
             }
             case IN_NUMBER: {
                 if (in(digits, peek_at(0))) {
-                    push_string((char[]){peek_at(0)}, 1);
+                    push_string(state, (unsigned char[]){peek_at(0)}, 1);
                     set_state_and_advance_by(IN_NUMBER, 1);
                 } else {
                     set_state_and_advance_by(EXPECT_FRACTION, 0);
@@ -259,7 +304,7 @@ EXPORT int rjson(char* string, struct state* state, void** tokens__) {
             }
             case EXPECT_FRACTION: {
                 if (peek_at(0) == '.') {
-                    push_string((char[]){peek_at(0)}, 1);
+                    push_string(state, (unsigned char[]){peek_at(0)}, 1);
                     set_state_and_advance_by(IN_FRACTION, 1);
                 } else {
                     set_state_and_advance_by(EXPECT_EXPONENT, 0);
@@ -269,10 +314,10 @@ EXPORT int rjson(char* string, struct state* state, void** tokens__) {
             }
             case EXPECT_EXPONENT: {
                 if (peek_at(0) == 'e' || peek_at(0) == 'E') {
-                    push_string((char[]){peek_at(0)}, 1);
+                    push_string(state, (unsigned char[]){peek_at(0)}, 1);
                     set_state_and_advance_by(EXPONENT_EXPECT_PLUS_MINUS, 1);
                 } else {
-                    push_token(NUMBER, string_pool + string_cursor, state);
+                    push_token(NUMBER, string_pool + state->string_cursor, state);
                     set_state_and_advance_by(WHITESPACE_AFTER_VALUE, 0);
                 }
 
@@ -280,7 +325,7 @@ EXPORT int rjson(char* string, struct state* state, void** tokens__) {
             }
             case IN_FRACTION: {
                 if (in(digits, peek_at(0))) {
-                    push_string((char[]){peek_at(0)}, 1);
+                    push_string(state, (unsigned char[]){peek_at(0)}, 1);
                     set_state_and_advance_by(IN_FRACTION_DIGIT, 1);
                 } else {
                     state->error = JSON_ERROR_INVALID_NUMBER;
@@ -290,7 +335,7 @@ EXPORT int rjson(char* string, struct state* state, void** tokens__) {
             }
             case IN_FRACTION_DIGIT: {
                 if (in(digits, peek_at(0))) {
-                    push_string((char[]){peek_at(0)}, 1);
+                    push_string(state, (unsigned char[]){peek_at(0)}, 1);
                     set_state_and_advance_by(IN_FRACTION_DIGIT, 1);
                 } else {
                     set_state_and_advance_by(EXPECT_EXPONENT, 0);
@@ -300,7 +345,7 @@ EXPORT int rjson(char* string, struct state* state, void** tokens__) {
             }
             case EXPONENT_EXPECT_PLUS_MINUS: {
                 if (peek_at(0) == '+' || peek_at(0) == '-') {
-                    push_string((char[]){peek_at(0)}, 1);
+                    push_string(state, (unsigned char[]){peek_at(0)}, 1);
                     set_state_and_advance_by(EXPECT_EXPONENT_DIGIT, 1);
                 } else {
                     set_state_and_advance_by(EXPECT_EXPONENT_DIGIT, 0);
@@ -310,7 +355,7 @@ EXPORT int rjson(char* string, struct state* state, void** tokens__) {
             }
             case EXPECT_EXPONENT_DIGIT: {
                 if (in(digits, peek_at(0))) {
-                    push_string((char[]){peek_at(0)}, 1);
+                    push_string(state, (unsigned char[]){peek_at(0)}, 1);
                     set_state_and_advance_by(IN_EXPONENT_DIGIT, 1);
                 } else {
                     state->error = JSON_ERROR_INVALID_NUMBER;
@@ -320,10 +365,10 @@ EXPORT int rjson(char* string, struct state* state, void** tokens__) {
             }
             case IN_EXPONENT_DIGIT: {
                 if (in(digits, peek_at(0))) {
-                    push_string((char[]) {peek_at(0)}, 1);
+                    push_string(state, (unsigned char[]) {peek_at(0)}, 1);
                     set_state_and_advance_by(IN_EXPONENT_DIGIT, 1);
                 } else {
-                    push_token(NUMBER, string_pool + string_cursor, state);
+                    push_token(NUMBER, string_pool + state->string_cursor, state);
                     set_state_and_advance_by(WHITESPACE_AFTER_VALUE, 0);
                 }
 
@@ -354,7 +399,7 @@ EXPORT int rjson(char* string, struct state* state, void** tokens__) {
             }
             case ASSOC_EXPECT_KEY: {
                 if(peek_at(0) == '"') {
-                    start_string();
+                    start_string(state);
                     set_state_and_advance_by(IN_STRING, 1);
                 } else {
                     state->error = JSON_ERROR_ASSOC_EXPECT_STRING_A_KEY;
@@ -367,7 +412,7 @@ EXPORT int rjson(char* string, struct state* state, void** tokens__) {
                 break;
             }
             case CLOSE_STRING: {
-                push_token(STRING, string_pool + string_cursor, state);
+                push_token(STRING, string_pool + state->string_cursor, state);
                 if (tokens[state->root_index].kind == OBJECT) {
                     push_root(state);
                     set_state_and_advance_by(ASSOC_AFTER_KEY_WHITESPACE, 0);

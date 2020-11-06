@@ -46,7 +46,9 @@ char * valid_json[] = {
     "[1 , 2 , 3 ]",
     "[1, 2, 3  ]",
     "[1, 2, 3  ]  ",
-    " \" a random string with \\u0000 correctly encoded null byte\"",
+    " \" à random string é with lower block characters.\"",
+//    " \" à random string é with \u1011 correctly encoded null byte\"",
+    " \" a random string with \\u0000 correctly encoded null byte.\"",
     "{\r\n\t "
         "\"foo\": \"bar\""
     "}",
@@ -91,7 +93,19 @@ char * valid_json[] = {
     "[[[0]]]",
     "[[[1, 3, [3, 5], 7]], 3]",
     "{\"foo\": 1, \"foo\": 1, \"foo\": 2, \"foo\": 1}",
-    "\"fo\0o\"",
+    "\"no\\\\ \\\"white\tspace\"",
+    "\"tést\"",
+//    "\"test 漫 \""
+};
+
+struct {
+    char * str;
+    size_t size;
+} bin_safe_json[] = {
+    {"\"fo\0o\"", sizeof("\"fo\0o\"")},
+    {"\"\0foo\"", sizeof("\"\0foo\"")},
+    {"\"foo\0\"", sizeof("\"foo\0\"")},
+    {"\"\0fo\12o\"", sizeof("\"\0fo\12o\"")}
 };
 
 /* shouldn't be parsed as valid json */
@@ -204,7 +218,7 @@ int main(void) {
     for (i = 0; i < sizeof(valid_json) / sizeof(valid_json[0]) ; i++) {
         struct state state = {0};
         void * tokens__;
-        int res = rjson(valid_json[i], &state, &tokens__);
+        int res = rjson((unsigned char*)valid_json[i], strlen(valid_json[i]), &state, &tokens__);
         printf("For >>> %s <<<, \n -> %s\n", valid_json[i], json_errors[state.error]);
         print_debug(&state);
         puts(to_string(tokens__, res));
@@ -218,8 +232,22 @@ int main(void) {
 
         struct state state = {0};
         void * tokens__;
-        int res = rjson(bogus_json[i], &state, &tokens__);
+        int res = rjson((unsigned char*)bogus_json[i], strlen(bogus_json[i]), &state, &tokens__);
         printf("For >>> %s <<<, \n -> %s\n", bogus_json[i], json_errors[state.error]);
+        print_debug(&state);
+        puts(to_string(tokens__, res));
+        fflush(stdout);
+        assert(state.error != JSON_ERROR_NO_ERRORS);
+    }
+
+    puts("\n\n\n*** BINARY SAFE ***");
+
+    for (i = 0; i < sizeof(bin_safe_json) / sizeof(bin_safe_json[0]) ; i++) {
+
+        struct state state = {0};
+        void * tokens__;
+        int res = rjson((unsigned char*)bin_safe_json[i].str, bin_safe_json[i].size, &state, &tokens__);
+        printf("For >>> %s <<<, \n -> %s\n", bin_safe_json[i].str, json_errors[state.error]);
         print_debug(&state);
         puts(to_string(tokens__, res));
         fflush(stdout);
@@ -233,7 +261,7 @@ int main(void) {
 
         struct state state = {.mode=JSON1};
         void * tokens__;
-        int res = rjson(bogus_json1[i], &state, &tokens__);
+        int res = rjson((unsigned char*)bogus_json1[i], strlen(bogus_json1[i]) - 1, &state, &tokens__);
         printf("For >>> %s <<<, \n -> %s\n", bogus_json1[i], json_errors[state.error]);
         print_debug();
         puts(to_string(tokens__, res));

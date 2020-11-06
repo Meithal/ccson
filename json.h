@@ -24,8 +24,9 @@
 #define NULL ((void *)0)
 #endif
 
+/*****************************************************/
+
 unsigned char string_pool[0x8000];
-size_t string_cursor = 1;
 struct token {
     enum kind {
         UNSET,
@@ -81,7 +82,9 @@ struct token tokens[0x200] = {{.kind=UNSET}};
   X(JSON_ERROR_ASSOC_EXPECT_COLON, "Missing colon after object key.") \
   X(JSON_ERROR_ASSOC_EXPECT_VALUE, "Missing value after JSON object key.")  \
   X(JSON_ERROR_NO_SIBLINGS, "Only Arrays and Objects can have sibling descendants.")      \
-  X(JSON_ERROR_JSON1_ONLY_ASSOC_ROOT, "JSON1 only allows objects as root element.")
+  X(JSON_ERROR_JSON1_ONLY_ASSOC_ROOT, "JSON1 only allows objects as root element.")  \
+  X(JSON_ERROR_UTF16_NOT_SUPPORTED_YET, "Code points greater than 0x0800 not supported yet.") \
+  X(JSON_ERROR_INCOMPLETE_UNICODE_ESCAPE, "Incomplete unicode character sequence.") \
 
 #define X(a, b) a,
 enum whitespace_tokens { WHITESPACE };
@@ -105,6 +108,7 @@ char * json_errors[] = {
 char digit_starters[] = "-0123456789";
 char digits[] = "0123456789";
 char digits19[] = "123456789";
+char hexdigits[] = "0123456789abcdefABCDEF";
 
 enum states {
     WHITESPACE_BEFORE_VALUE,
@@ -136,6 +140,8 @@ enum states {
     ASSOC_AFTER_INNER_VALUE
 };
 
+char num_to_hex[] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
+
 #ifdef WANT_JSON1
 enum json_mode {
     JSON2,
@@ -150,12 +156,13 @@ struct state {
     enum json_errors error;
     int root_index;
     int token_cursor;
+    int string_cursor;
 #ifdef WANT_JSON1
     enum json_mode mode;
 #endif
 };
 
-EXPORT int rjson(char*, struct state*, void** );
+EXPORT int rjson(unsigned char*, size_t len, struct state*, void** );
 void print_debug(struct state * state);
 char * to_string(struct token[0x200], int);
 
