@@ -1,6 +1,7 @@
 #include "json.h"
-#include <assert.h>
 #include <stdio.h>
+#ifdef HAS_VLA
+#include <assert.h>
 
 char * valid_json[] = {
     "true",
@@ -45,7 +46,7 @@ char * valid_json[] = {
     "[1 , 2 , 3 ]",
     "[1, 2, 3  ]",
     "[1, 2, 3  ]  ",
-//    " \" a random string with \\u0000 correctly encoded null byte\"",
+    " \" a random string with \\u0000 correctly encoded null byte\"",
     "{\r\n\t "
         "\"foo\": \"bar\""
     "}",
@@ -88,7 +89,9 @@ char * valid_json[] = {
         "}"
     "]",
     "[[[0]]]",
-    "[[[1, 3, [3, 5], 7]], 3]"
+    "[[[1, 3, [3, 5], 7]], 3]",
+    "{\"foo\": 1, \"foo\": 1, \"foo\": 2, \"foo\": 1}",
+    "\"fo\0o\"",
 };
 
 /* shouldn't be parsed as valid json */
@@ -185,13 +188,25 @@ char * bogus_json[] = {
     "{\"test\":}",
 };
 
-int main(void) {
+#ifdef WANT_JSON1
+char * bogus_json1[] = {
+    "true",
+    "1",
+    "[1, 2, 3]"
+};
+#endif
 
-    for (int i = 0; i < sizeof(valid_json) / sizeof(valid_json[0]) ; i++) {
+int main(void) {
+    int i;
+
+    puts("*** ALL SHOULD SUCCEED ***");
+
+    for (i = 0; i < sizeof(valid_json) / sizeof(valid_json[0]) ; i++) {
         struct state state = {0};
         void * tokens__;
         int res = rjson(valid_json[i], &state, &tokens__);
         printf("For >>> %s <<<, \n -> %s\n", valid_json[i], json_errors[state.error]);
+        print_debug();
         puts(to_string(tokens__, res));
         fflush(stdout);
         assert(state.error == JSON_ERROR_NO_ERRORS);
@@ -199,16 +214,38 @@ int main(void) {
 
     puts("\n\n\n*** ALL SHOULD FAIL ***");
 
-    for (int i = 0; i < sizeof(bogus_json) / sizeof(bogus_json[0]) ; i++) {
+    for (i = 0; i < sizeof(bogus_json) / sizeof(bogus_json[0]) ; i++) {
 
         struct state state = {0};
         void * tokens__;
         int res = rjson(bogus_json[i], &state, &tokens__);
         printf("For >>> %s <<<, \n -> %s\n", bogus_json[i], json_errors[state.error]);
+        print_debug();
         puts(to_string(tokens__, res));
         fflush(stdout);
         assert(state.error != JSON_ERROR_NO_ERRORS);
     }
 
+#ifdef WANT_JSON1
+    puts("\n\n\n*** SHOULD FAIL IN JSON1 MODE***");
+
+    for (i = 0; i < sizeof(bogus_json1) / sizeof(bogus_json1[0]) ; i++) {
+
+        struct state state = {.mode=JSON1};
+        void * tokens__;
+        int res = rjson(bogus_json1[i], &state, &tokens__);
+        printf("For >>> %s <<<, \n -> %s\n", bogus_json1[i], json_errors[state.error]);
+        print_debug();
+        puts(to_string(tokens__, res));
+        fflush(stdout);
+        assert(state.error == JSON_ERROR_JSON1_ONLY_ASSOC_ROOT);
+    }
+#endif
+
     return 0;
 }
+#else
+int main(void) {
+    puts("MSVC doesn't handle VLAS, no testing.");
+}
+#endif

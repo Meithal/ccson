@@ -1,7 +1,28 @@
 #ifndef JSON_JSON_H
 #define JSON_JSON_H
 #include<stdlib.h>
+#include<assert.h>
+#include<string.h>
+#include<stdio.h>
 
+
+#if (!(defined(_WIN32) || defined(_WIN64)) \
+|| defined(__CYGWIN__) \
+|| defined(__MINGW32__) \
+|| defined(__MINGW64__))
+#define HAS_VLA
+#endif
+
+#ifdef HAS_VLA
+#define EXPORT
+#else
+#define EXPORT __declspec(dllexport)
+#endif
+
+#ifndef NULL  /* No libC */
+#define size_t unsigned long long
+#define NULL ((void *)0)
+#endif
 
 char string_pool[0x8000];
 size_t string_cursor = 1;
@@ -20,15 +41,14 @@ struct token {
     int root_index;
     void * address;
 };
-struct token tokens[0x200] = {(struct token) {.kind=ROOT}, (struct token) {.kind=UNSET}};
+struct token tokens[0x200] = {{.kind=UNSET}};
 int token_cursor = 1;
 
 /**
  * Json structures are stored as a flat array of objects holding
  * a link to their parent whose value is their index in that array, index zero being the root
- * Json doesn't require json arrays elements to have an order so sibling data is not stored
+ * Json doesn't require json arrays elements to have an order so sibling data is not stored.
  */
-
 
 static int JSON_TRUE_SINGLETON;
 static int JSON_FALSE_SINGLETON;
@@ -65,7 +85,8 @@ static int JSON_NULL_SINGLETON;
   X(JSON_ERROR_ASSOC_EXPECT_STRING_A_KEY, "A JSON object key must be a quoted string.") \
   X(JSON_ERROR_ASSOC_EXPECT_COLON, "Missing colon after object key.") \
   X(JSON_ERROR_ASSOC_EXPECT_VALUE, "Missing value after JSON object key.")  \
-  X(JSON_ERROR_NO_SIBLINGS, "Only Arrays and Objects can have sibling descendants.")  \
+  X(JSON_ERROR_NO_SIBLINGS, "Only Arrays and Objects can have sibling descendants.")      \
+  X(JSON_ERROR_JSON1_ONLY_ASSOC_ROOT, "JSON1 only allows objects as root element.")
 
 #define X(a, b) a,
 enum whitespace_tokens { WHITESPACE };
@@ -120,13 +141,24 @@ enum states {
     ASSOC_AFTER_INNER_VALUE
 };
 
+#ifdef WANT_JSON1
+enum json_mode {
+    JSON2,
+    JSON1,
+    RELAXED,
+};
+#endif
+
 struct state {
     enum states kind;
     int ordinal;
     enum json_errors error;
+#ifdef WANT_JSON1
+    enum json_mode mode;
+#endif
 };
 
-int rjson(char*, struct state*, void** );
+EXPORT int rjson(char*, struct state*, void** );
 void print_debug(void);
 char * to_string(struct token[0x200], int);
 

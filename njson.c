@@ -1,14 +1,6 @@
-//
-// Created on 15/01/2020.
-//
-
 #include "json.h"
-#include<assert.h>
-#include<string.h>
-#include<stdio.h>
-#include<stdbool.h>
 
-size_t len_whitespace(char* string, struct state * state) {
+int static len_whitespace(char* string, struct state * state) {
     int count = 0;
     while(string[state->ordinal + count] != '\0' && strchr(whitespaces, string[state->ordinal + count]) != NULL) {
         count++;
@@ -16,42 +8,40 @@ size_t len_whitespace(char* string, struct state * state) {
     return count;
 }
 
-void start_string() {
-    string_cursor += string_pool[string_cursor-1] + 1;
+void static start_string() {
+    string_cursor += (int)string_pool[string_cursor-1] + 1;
 }
 
-void push_string(char* string, size_t length) {
+void static push_string(char* string, int length) {
     assert(length > 0);
     memcpy(string_pool + string_cursor + string_pool[string_cursor-1], string, length);
     string_pool[string_cursor-1] += length;
 }
 
-void close_root(int * root_index) {
+void static close_root(int * root_index) {
     *root_index = tokens[*root_index].root_index;
 }
 
-void push_root(int * root_index) {
+void static push_root(int * root_index) {
     *root_index = token_cursor - 1;
 }
 
-void push_token(enum kind kind, void * address, int root_index) {
-    tokens[token_cursor] = (struct token) {.kind=kind, .root_index=root_index, .address=address};
-    token_cursor++;
+void static push_token(enum kind kind, void * address, int root_index) {
+    tokens[token_cursor++] = (struct token) {.kind=kind, .root_index=root_index, .address=address};
 }
 
 static inline size_t remaining(char * string, struct state* state) {
     return strlen(string + state->ordinal);
 }
 
-static inline _Bool in(char* hay, char needle) {
+static inline int in(char* hay, char needle) {
     return needle != '\0' && strchr(hay, needle);
 }
 
 #define peek_at(where) string[state->ordinal + where]
 #define set_state_and_advance_by(which_, advance_) state->kind = which_; state->ordinal += advance_; to_inc = 0
-int rjson(char* string, struct state* state, void** tokens__) {
+EXPORT int rjson(char* string, struct state* state, void** tokens__) {
 
-    size_t total_length = strlen(string);
     *tokens__ = tokens;
 
     memcpy(tokens, (struct token [0x200]){(struct token) {.kind=ROOT}}, sizeof (struct token[0x200]));
@@ -63,14 +53,16 @@ int rjson(char* string, struct state* state, void** tokens__) {
     // todo: make fully reentrant
     // todo: make ANSI/STDC compatible
     // fixme: handle unicode literals
-    // fixme: output as string (stringify)
+    // todo: make libc optional
+    // fixme: longer than 64 bytes strings
+    // fixme: create tree from nothing
 
     if (state->ordinal == 0) {
         state->error = JSON_ERROR_NO_ERRORS;
         state->kind = WHITESPACE_BEFORE_VALUE;
     }
 
-    while(true) {
+    for(;;) {
 
         int to_inc = -999;
         switch (state->kind) {
@@ -133,6 +125,10 @@ int rjson(char* string, struct state* state, void** tokens__) {
                 if (tokens[root_index].kind == ROOT) {
                     if (remaining(string, state)) {
                         state->error = JSON_ERROR_NO_SIBLINGS;
+#ifdef WANT_JSON1
+                    } else if(state->mode == JSON1 && tokens[token_cursor-1].kind != OBJECT) {
+                        state->error = JSON_ERROR_JSON1_ONLY_ASSOC_ROOT;
+#endif
                     } else {
                         return token_cursor;
                     }
@@ -145,9 +141,6 @@ int rjson(char* string, struct state* state, void** tokens__) {
                 }
                 else if(tokens[root_index].kind == STRING) {
                     set_state_and_advance_by(ASSOC_AFTER_INNER_VALUE, 0);
-                }
-                else {
-                    assert(0);
                 }
 
                 break;
@@ -415,8 +408,10 @@ int rjson(char* string, struct state* state, void** tokens__) {
 #undef set_state_and_advance_by
 }
 
+#ifdef HAS_VLA
 void print_debug(void) {
-    for (int j = 0; j < token_cursor; ++j) {
+    int j;
+    for (j = 0; j < token_cursor; ++j) {
         printf("%d: kind: %s, root: %d", j, (char*[]){
                 "UNSET", "ROOT", "TRUE", "FALSE", "JSON_NULL",
                 "STRING", "NUMBER", "ARRAY", "OBJECT", "OBJECT_KEY"
@@ -432,7 +427,7 @@ void print_debug(void) {
 }
 
 static char ident_s[0x80];
-static char * _print_ident(int ident) {
+static char * print_ident(int ident) {
     memset(ident_s, ' ', ident * 2);
     ident_s[ident * 2] = '\0';
 
@@ -441,15 +436,18 @@ static char * _print_ident(int ident) {
 
 
 char * to_string(struct token tokens_[0x200], int max) {
+    // todo: make the caller handle the buffer
+
     static char output[0x1600];
     memset(output, 0, sizeof output);
     int cursor = 0;
     int ident = 0;
-    for (int j = 0; j < max; ++j) {
-        if (j && tokens_[tokens_[j].root_index].kind == STRING) {
+    int j;
+    for (j = 1; j < max; ++j) {
+        if (tokens_[tokens_[j].root_index].kind == STRING) {
             cursor += sprintf(output + cursor, ": ");
         } else {
-            cursor += sprintf(output + cursor, "%s", _print_ident(ident));
+            cursor += sprintf(output + cursor, "%s", print_ident(ident));
         }
 
         if (tokens_[j].kind == TRUE) cursor += sprintf(output + cursor, "true");
@@ -465,23 +463,24 @@ char * to_string(struct token tokens_[0x200], int max) {
         }
         if (tokens_[j].kind == ARRAY) cursor += sprintf(output + cursor, "[\n"), ident++;
         if (tokens_[j].kind == OBJECT) cursor += sprintf(output + cursor, "{\n"), ident++;
-        if (j && j <= max) {
+        if (j <= max) {
             if (tokens_[j + 1].root_index < tokens_[j].root_index) {
-                if (j + 1 == max || tokens_[j + 1].root_index != tokens_[tokens_[j].root_index].root_index || tokens_[tokens_[j + 1].root_index].kind == ARRAY) {
+                if (j + 1 == max
+                || tokens_[j + 1].root_index != tokens_[tokens_[j].root_index].root_index
+                || tokens_[tokens_[j + 1].root_index].kind == ARRAY) {
                     int target = tokens_[j + 1].root_index;
                     int cur_node = j;
-                    while (true) {
+                    for (;;) {
 
                         if(tokens_[tokens_[cur_node].root_index].kind == ARRAY) {
-                            cursor += sprintf(output + cursor, "\n%s]", _print_ident(--ident));
+                            cursor += sprintf(output + cursor, "\n%s]", print_ident(--ident));
                         }
                         else if(tokens_[tokens_[cur_node].root_index].kind == OBJECT) {
-                            cursor += sprintf(output + cursor, "\n%s}", _print_ident(--ident));
+                            cursor += sprintf(output + cursor, "\n%s}", print_ident(--ident));
                         }
                         if(tokens_[(cur_node = tokens_[cur_node].root_index)].root_index == target) {
                             break;
                         }
-
                     }
                 }
             }
@@ -495,3 +494,4 @@ char * to_string(struct token tokens_[0x200], int max) {
     snprintf(output + cursor, 1, "");
     return output;
 }
+#endif // HAS_VLA
