@@ -1,6 +1,5 @@
 #ifndef JSON_JSON_H
 #define JSON_JSON_H
-#include<stdlib.h>
 #include<string.h>
 #include<stdio.h>
 
@@ -174,8 +173,8 @@ struct state {
 /* Parsing */
 EXPORT int rjson(unsigned char*, size_t len, struct state*);
 /* Output */
-EXPORT void print_debug(struct state * state);
-EXPORT char * to_string(struct token[0x200], int);
+EXPORT char* print_debug(struct state * state);
+EXPORT char* to_string(struct token[0x200], int);
 /* Building */
 EXPORT void start_string(struct state * state);
 EXPORT void push_string(struct state* state, char* string, int length);

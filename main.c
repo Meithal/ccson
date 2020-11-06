@@ -220,7 +220,7 @@ int main(void) {
         struct state state = {0};
         int res = rjson((unsigned char*)valid_json[i], strlen(valid_json[i]), &state);
         printf("For >>> %s <<<, \n -> %s\n", valid_json[i], json_errors[state.error]);
-        print_debug(&state);
+        puts(print_debug(&state));
         puts(to_string(*(state.tokens_stack), res));
         fflush(stdout);
         assert(state.error == JSON_ERROR_NO_ERRORS);
@@ -233,7 +233,7 @@ int main(void) {
         struct state state = {0};
         int res = rjson((unsigned char*)bogus_json[i], strlen(bogus_json[i]), &state);
         printf("For >>> %s <<<, \n -> %s\n", bogus_json[i], json_errors[state.error]);
-        print_debug(&state);
+        puts(print_debug(&state));
         puts(to_string(*(state.tokens_stack), res));
         fflush(stdout);
         assert(state.error != JSON_ERROR_NO_ERRORS);
@@ -246,7 +246,7 @@ int main(void) {
         struct state state = {0};
         int res = rjson((unsigned char*)bin_safe_json[i].str, bin_safe_json[i].size, &state);
         printf("For >>> %s <<<, \n -> %s\n", bin_safe_json[i].str, json_errors[state.error]);
-        print_debug(&state);
+        puts(print_debug(&state));
         puts(to_string(*(state.tokens_stack), res));
         fflush(stdout);
         assert(state.error != JSON_ERROR_NO_ERRORS);
@@ -258,11 +258,10 @@ int main(void) {
     for (i = 0; i < sizeof(bogus_json1) / sizeof(bogus_json1[0]) ; i++) {
 
         struct state state = {.mode=JSON1};
-        void * tokens__;
-        int res = rjson((unsigned char*)bogus_json1[i], strlen(bogus_json1[i]) - 1, &state, &tokens__);
+        int res = rjson((unsigned char*)bogus_json1[i], strlen(bogus_json1[i]) - 1, &state);
         printf("For >>> %s <<<, \n -> %s\n", bogus_json1[i], json_errors[state.error]);
-        print_debug();
-        puts(to_string(tokens__, res));
+        puts(print_debug(&state));
+        puts(to_string(*(state.tokens_stack), res));
         fflush(stdout);
         assert(state.error == JSON_ERROR_JSON1_ONLY_ASSOC_ROOT);
     }

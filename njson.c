@@ -53,6 +53,10 @@ EXPORT int rjson(unsigned char* string, size_t len, struct state* state) {
     push_token(ROOT, NULL, state);
     memset(*state->string_pool, 0, sizeof *state->string_pool);
 
+    // fixme: autogenerate single header
+    // fixme: less verbose
+    // fixme: less arguments
+    // fixme: complete example with self managed memory.
     // todo: make fully reentrant
     // todo: make ANSI/STDC compatible
     // todo: make libc optional
@@ -455,22 +459,28 @@ EXPORT int rjson(unsigned char* string, size_t len, struct state* state) {
 #undef set_state_and_advance_by
 }
 
-EXPORT void print_debug(struct state * state) {
+EXPORT char* print_debug(struct state * state) {
     int j;
+    int cursor = 0;
+
+    static char output[STRING_POOL_SIZE];
     for (j = 0; j < state->token_cursor; ++j) {
-        printf("%d: kind: %s, root: %d", j, (char*[]){
+        cursor += sprintf(output, "%d: kind: %s, root: %d", j, (char*[]){
                 "UNSET", "ROOT", "TRUE", "FALSE", "JSON_NULL",
                 "STRING", "NUMBER", "ARRAY", "OBJECT", "OBJECT_KEY"
         }[(*state->tokens_stack)[j].kind],
                 (*state->tokens_stack)[j].root_index);
         if((*state->tokens_stack)[j].kind == STRING || (*state->tokens_stack)[j].kind == NUMBER) {
             char dest[STRING_POOL_SIZE] = {0};
-            printf(", value: %s",
+            cursor += sprintf(output + cursor, ", value: %s",
                    (char*)memcpy(dest, (char*)((*state->tokens_stack)[j].address)+1, *((char*)(*state->tokens_stack)[j].address))
                    );
         }
-        puts("");
+        snprintf(output + cursor, 1, "");
+
     }
+
+    return output;
 }
 
 static char ident_s[0x80];
@@ -484,10 +494,11 @@ static char * print_ident(int ident) {
 
 EXPORT char * to_string(struct token tokens_[0x200], int max) {
     // todo: make the caller handle the buffer
+    // todo: add compact output for tests
 
     struct token *tokens = tokens_;
 
-    static char output[0x1600];
+    static char output[STRING_POOL_SIZE];
     memset(output, 0, sizeof output);
     int cursor = 0;
     int ident = 0;
