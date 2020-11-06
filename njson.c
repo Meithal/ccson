@@ -12,7 +12,7 @@ void static start_string(struct state * state) {
     state->string_cursor += (int)string_pool[state->string_cursor-1] + 1;
 }
 
-void static push_string(struct state* state, unsigned char* string, int length) {
+void static push_string(struct state* state, char* string, int length) {
     assert(length > 0);
     memcpy(string_pool + state->string_cursor + string_pool[state->string_cursor-1], string, length);
     string_pool[state->string_cursor-1] += length;
@@ -179,28 +179,13 @@ EXPORT int rjson(unsigned char* string, size_t len, struct state* state, void** 
             }
             case LITERAL_ESCAPE: {
                 if (peek_at(0) == '\\') {
-                    push_string(state, (unsigned char*)"\\\\", 2);
+                    push_string(state, "\\\\", 2);
                 }
                 else if (peek_at(0) == '"') {
-                    push_string(state, (unsigned char*)"\\\"", 2);
+                    push_string(state, "\\\"", 2);
                 }
                 else if (peek_at(0) == '/') {
-                    push_string(state, (unsigned char*)"\\/", 2);
-                }
-                else if (peek_at(0) == 'b') {
-                    push_string(state, (unsigned char*)"\\b", 2);
-                }
-                else if (peek_at(0) == 'f') {
-                    push_string(state, (unsigned char*)"\\f", 2);
-                }
-                else if (peek_at(0) == 'n') {
-                    push_string(state, (unsigned char*)"\\n", 2);
-                }
-                else if (peek_at(0) == 'r') {
-                    push_string(state, (unsigned char*)"\\r", 2);
-                }
-                else if (peek_at(0) == 't') {
-                    push_string(state, (unsigned char*)"\\t", 2);
+                    push_string(state, "\\/", 2);
                 }
                 else if (peek_at(0) == 'u') {
                     if(!(in(hexdigits, peek_at(1))
@@ -211,8 +196,8 @@ EXPORT int rjson(unsigned char* string, size_t len, struct state* state, void** 
                         state->error = JSON_ERROR_INCOMPLETE_UNICODE_ESCAPE;
                         break;
                     }
-                    push_string(state, (unsigned char*)"\\u", 2);
-                    push_string(state, string+state->ordinal+1, 4);
+                    push_string(state, "\\u", 2);
+                    push_string(state, (char*)string+state->ordinal+1, 4);
                     set_state_and_advance_by(IN_STRING, 5);
                     break;
                 }
@@ -236,10 +221,30 @@ EXPORT int rjson(unsigned char* string, size_t len, struct state* state, void** 
                 {
                     set_state_and_advance_by(CLOSE_STRING, 1);
                 }
+                else if (peek_at(0) == '\b') {
+                    push_string(state, "\\b", 2);
+                    set_state_and_advance_by(IN_STRING, 1);
+                }
+                else if (peek_at(0) == '\f') {
+                    push_string(state, "\\f", 2);
+                    set_state_and_advance_by(IN_STRING, 1);
+                }
+                else if (peek_at(0) == '\n') {
+                    push_string(state, "\\n", 2);
+                    set_state_and_advance_by(IN_STRING, 1);
+                }
+                else if (peek_at(0) == '\r') {
+                    push_string(state, "\\r", 2);
+                    set_state_and_advance_by(IN_STRING, 1);
+                }
+                else if (peek_at(0) == '\t') {
+                    push_string(state, "\\t", 2);
+                    set_state_and_advance_by(IN_STRING, 1);
+                }
                 else if(peek_at(0) < ' ')
-                { /* todo: shortcuts for \b, \t, \n, ... */
-                    push_string(state, (unsigned char*)"\\u00", 4);
-                    push_string(state, (unsigned char[2]){num_to_hex[peek_at(0)/16], num_to_hex[peek_at(0)%16]}, 2);
+                {
+                    push_string(state, "\\u00", 4);
+                    push_string(state, (char[2]){num_to_hex[peek_at(0)/16], num_to_hex[peek_at(0)%16]}, 2);
                     set_state_and_advance_by(IN_STRING, 1);
                 }
 //                else if(peek_at(0) > 0xffff) { /* In UTF16 realm */
@@ -252,13 +257,13 @@ EXPORT int rjson(unsigned char* string, size_t len, struct state* state, void** 
                         state->error = JSON_ERROR_UTF16_NOT_SUPPORTED_YET;
                         break;
                     }
-                    push_string(state, (unsigned char*)"\\u00", 4);
+                    push_string(state, "\\u00", 4);
                     unsigned char decoded = (string[state->ordinal]&0x1Fu<<5u)|(string[state->ordinal+1]&0x7Fu);
-                    push_string(state, (unsigned char[2]){num_to_hex[decoded/16], num_to_hex[decoded%16]}, 2);
+                    push_string(state, (char[2]){num_to_hex[decoded/16], num_to_hex[decoded%16]}, 2);
                     set_state_and_advance_by(IN_STRING, 2);
                 }
                 else {
-                    push_string(state, (unsigned char[]){peek_at(0)}, 1);
+                    push_string(state, (char[]){peek_at(0)}, 1);
                     set_state_and_advance_by(IN_STRING, 1);
                 }
 
@@ -270,7 +275,7 @@ EXPORT int rjson(unsigned char* string, size_t len, struct state* state, void** 
             }
             case START_NUMBER: {
                 if (peek_at(0) == '-') {
-                    push_string(state, (unsigned char[]){peek_at(0)}, 1);
+                    push_string(state, (char[]){peek_at(0)}, 1);
                     set_state_and_advance_by(NUMBER_AFTER_MINUS, 1);
                 } else {
                     set_state_and_advance_by(NUMBER_AFTER_MINUS, 0);
@@ -281,10 +286,10 @@ EXPORT int rjson(unsigned char* string, size_t len, struct state* state, void** 
             case NUMBER_AFTER_MINUS:
             {
                 if (peek_at(0) == '0') {
-                    push_string(state, (unsigned char[]){peek_at(0)}, 1);
+                    push_string(state, (char[]){peek_at(0)}, 1);
                     set_state_and_advance_by(EXPECT_FRACTION, 1);
                 } else if (in(digits19, peek_at(0))) {
-                    push_string(state, (unsigned char[]){peek_at(0)}, 1);
+                    push_string(state, (char[]){peek_at(0)}, 1);
                     set_state_and_advance_by(IN_NUMBER, 1);
                 } else {
                     state->error = JSON_ERROR_INVALID_NUMBER;
@@ -294,7 +299,7 @@ EXPORT int rjson(unsigned char* string, size_t len, struct state* state, void** 
             }
             case IN_NUMBER: {
                 if (in(digits, peek_at(0))) {
-                    push_string(state, (unsigned char[]){peek_at(0)}, 1);
+                    push_string(state, (char[]){peek_at(0)}, 1);
                     set_state_and_advance_by(IN_NUMBER, 1);
                 } else {
                     set_state_and_advance_by(EXPECT_FRACTION, 0);
@@ -304,7 +309,7 @@ EXPORT int rjson(unsigned char* string, size_t len, struct state* state, void** 
             }
             case EXPECT_FRACTION: {
                 if (peek_at(0) == '.') {
-                    push_string(state, (unsigned char[]){peek_at(0)}, 1);
+                    push_string(state, (char[]){peek_at(0)}, 1);
                     set_state_and_advance_by(IN_FRACTION, 1);
                 } else {
                     set_state_and_advance_by(EXPECT_EXPONENT, 0);
@@ -314,7 +319,7 @@ EXPORT int rjson(unsigned char* string, size_t len, struct state* state, void** 
             }
             case EXPECT_EXPONENT: {
                 if (peek_at(0) == 'e' || peek_at(0) == 'E') {
-                    push_string(state, (unsigned char[]){peek_at(0)}, 1);
+                    push_string(state, (char[]){peek_at(0)}, 1);
                     set_state_and_advance_by(EXPONENT_EXPECT_PLUS_MINUS, 1);
                 } else {
                     push_token(NUMBER, string_pool + state->string_cursor, state);
@@ -325,7 +330,7 @@ EXPORT int rjson(unsigned char* string, size_t len, struct state* state, void** 
             }
             case IN_FRACTION: {
                 if (in(digits, peek_at(0))) {
-                    push_string(state, (unsigned char[]){peek_at(0)}, 1);
+                    push_string(state, (char[]){peek_at(0)}, 1);
                     set_state_and_advance_by(IN_FRACTION_DIGIT, 1);
                 } else {
                     state->error = JSON_ERROR_INVALID_NUMBER;
@@ -335,7 +340,7 @@ EXPORT int rjson(unsigned char* string, size_t len, struct state* state, void** 
             }
             case IN_FRACTION_DIGIT: {
                 if (in(digits, peek_at(0))) {
-                    push_string(state, (unsigned char[]){peek_at(0)}, 1);
+                    push_string(state, (char[]){peek_at(0)}, 1);
                     set_state_and_advance_by(IN_FRACTION_DIGIT, 1);
                 } else {
                     set_state_and_advance_by(EXPECT_EXPONENT, 0);
@@ -345,7 +350,7 @@ EXPORT int rjson(unsigned char* string, size_t len, struct state* state, void** 
             }
             case EXPONENT_EXPECT_PLUS_MINUS: {
                 if (peek_at(0) == '+' || peek_at(0) == '-') {
-                    push_string(state, (unsigned char[]){peek_at(0)}, 1);
+                    push_string(state, (char[]){peek_at(0)}, 1);
                     set_state_and_advance_by(EXPECT_EXPONENT_DIGIT, 1);
                 } else {
                     set_state_and_advance_by(EXPECT_EXPONENT_DIGIT, 0);
@@ -355,7 +360,7 @@ EXPORT int rjson(unsigned char* string, size_t len, struct state* state, void** 
             }
             case EXPECT_EXPONENT_DIGIT: {
                 if (in(digits, peek_at(0))) {
-                    push_string(state, (unsigned char[]){peek_at(0)}, 1);
+                    push_string(state, (char[]){peek_at(0)}, 1);
                     set_state_and_advance_by(IN_EXPONENT_DIGIT, 1);
                 } else {
                     state->error = JSON_ERROR_INVALID_NUMBER;
@@ -365,7 +370,7 @@ EXPORT int rjson(unsigned char* string, size_t len, struct state* state, void** 
             }
             case IN_EXPONENT_DIGIT: {
                 if (in(digits, peek_at(0))) {
-                    push_string(state, (unsigned char[]) {peek_at(0)}, 1);
+                    push_string(state, (char[]) {peek_at(0)}, 1);
                     set_state_and_advance_by(IN_EXPONENT_DIGIT, 1);
                 } else {
                     push_token(NUMBER, string_pool + state->string_cursor, state);

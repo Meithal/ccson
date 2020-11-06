@@ -95,6 +95,8 @@ char * valid_json[] = {
     "{\"foo\": 1, \"foo\": 1, \"foo\": 2, \"foo\": 1}",
     "\"no\\\\ \\\"white\tspace\"",
     "\"tést\"",
+    "\"expect shortcuts \\\", \\\\, \\/, \b, \f, \n, \r, \r, \t  \"",
+    "\"no shortcuts \a, \v, \' \047 \"",
 //    "\"test 漫 \""
 };
 
@@ -224,7 +226,7 @@ int main(void) {
         puts(to_string(tokens__, res));
         fflush(stdout);
         assert(state.error == JSON_ERROR_NO_ERRORS);
-    }
+    }return 0;
 
     puts("\n\n\n*** ALL SHOULD FAIL ***");
 
