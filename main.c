@@ -206,7 +206,7 @@ int main(void) {
         void * tokens__;
         int res = rjson(valid_json[i], &state, &tokens__);
         printf("For >>> %s <<<, \n -> %s\n", valid_json[i], json_errors[state.error]);
-        print_debug();
+        print_debug(&state);
         puts(to_string(tokens__, res));
         fflush(stdout);
         assert(state.error == JSON_ERROR_NO_ERRORS);
@@ -220,7 +220,7 @@ int main(void) {
         void * tokens__;
         int res = rjson(bogus_json[i], &state, &tokens__);
         printf("For >>> %s <<<, \n -> %s\n", bogus_json[i], json_errors[state.error]);
-        print_debug();
+        print_debug(&state);
         puts(to_string(tokens__, res));
         fflush(stdout);
         assert(state.error != JSON_ERROR_NO_ERRORS);

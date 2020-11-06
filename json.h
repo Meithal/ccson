@@ -24,7 +24,7 @@
 #define NULL ((void *)0)
 #endif
 
-char string_pool[0x8000];
+unsigned char string_pool[0x8000];
 size_t string_cursor = 1;
 struct token {
     enum kind {
@@ -42,17 +42,12 @@ struct token {
     void * address;
 };
 struct token tokens[0x200] = {{.kind=UNSET}};
-int token_cursor = 1;
 
 /**
  * Json structures are stored as a flat array of objects holding
  * a link to their parent whose value is their index in that array, index zero being the root
  * Json doesn't require json arrays elements to have an order so sibling data is not stored.
  */
-
-static int JSON_TRUE_SINGLETON;
-static int JSON_FALSE_SINGLETON;
-static int JSON_NULL_SINGLETON;
 
 
 #define WHITESPACE \
@@ -153,13 +148,15 @@ struct state {
     enum states kind;
     int ordinal;
     enum json_errors error;
+    int root_index;
+    int token_cursor;
 #ifdef WANT_JSON1
     enum json_mode mode;
 #endif
 };
 
 EXPORT int rjson(char*, struct state*, void** );
-void print_debug(void);
+void print_debug(struct state * state);
 char * to_string(struct token[0x200], int);
 
 #endif //JSON_JSON_H
