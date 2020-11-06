@@ -8,7 +8,7 @@ char * valid_json[] = {
     "true  ",
     "  \t  true  ",
     "  \t  true",
-    "0",
+    "10",
     "-0",
     "1",
     "123",
@@ -47,7 +47,7 @@ char * valid_json[] = {
     "[1, 2, 3  ]",
     "[1, 2, 3  ]  ",
     " \" à random string é with lower block characters.\"",
-//    " \" à random string é with \u1011 correctly encoded null byte\"",
+//    " \" \u1011 random string é with \u1011 correctly encoded null byte\"",
     " \" a random string with \\u0000 correctly encoded null byte.\"",
     "{\r\n\t "
         "\"foo\": \"bar\""
@@ -219,22 +219,20 @@ int main(void) {
 
     for (i = 0; i < sizeof(valid_json) / sizeof(valid_json[0]) ; i++) {
         struct state state = {0};
-        void * tokens__;
-        int res = rjson((unsigned char*)valid_json[i], strlen(valid_json[i]), &state, &tokens__);
+        int res = rjson((unsigned char*)valid_json[i], strlen(valid_json[i]), &state);
         printf("For >>> %s <<<, \n -> %s\n", valid_json[i], json_errors[state.error]);
         print_debug(&state);
         puts(to_string(tokens__, res));
         fflush(stdout);
         assert(state.error == JSON_ERROR_NO_ERRORS);
-    }return 0;
+    }
 
     puts("\n\n\n*** ALL SHOULD FAIL ***");
 
     for (i = 0; i < sizeof(bogus_json) / sizeof(bogus_json[0]) ; i++) {
 
         struct state state = {0};
-        void * tokens__;
-        int res = rjson((unsigned char*)bogus_json[i], strlen(bogus_json[i]), &state, &tokens__);
+        int res = rjson((unsigned char*)bogus_json[i], strlen(bogus_json[i]), &state);
         printf("For >>> %s <<<, \n -> %s\n", bogus_json[i], json_errors[state.error]);
         print_debug(&state);
         puts(to_string(tokens__, res));
@@ -247,8 +245,7 @@ int main(void) {
     for (i = 0; i < sizeof(bin_safe_json) / sizeof(bin_safe_json[0]) ; i++) {
 
         struct state state = {0};
-        void * tokens__;
-        int res = rjson((unsigned char*)bin_safe_json[i].str, bin_safe_json[i].size, &state, &tokens__);
+        int res = rjson((unsigned char*)bin_safe_json[i].str, bin_safe_json[i].size, &state);
         printf("For >>> %s <<<, \n -> %s\n", bin_safe_json[i].str, json_errors[state.error]);
         print_debug(&state);
         puts(to_string(tokens__, res));
@@ -271,6 +268,8 @@ int main(void) {
         assert(state.error == JSON_ERROR_JSON1_ONLY_ASSOC_ROOT);
     }
 #endif
+
+
 
     return 0;
 }

@@ -14,7 +14,7 @@
 #endif
 
 #ifdef HAS_VLA
-#define EXPORT
+#define EXPORT extern
 #else
 #define EXPORT __declspec(dllexport)
 #endif
@@ -26,7 +26,7 @@
 
 /*****************************************************/
 
-unsigned char string_pool[0x8000];
+
 struct token {
     enum kind {
         UNSET,
@@ -42,14 +42,22 @@ struct token {
     int root_index;
     void * address;
 };
-struct token tokens[0x200] = {{.kind=UNSET}};
+#ifndef SELF_MANAGE_MEMORY
+unsigned char string_pool__[STRING_POOL_SIZE];
+struct token tokens__[MAX_TOKENS] = {{.kind=UNSET}};
+#endif
+#ifndef STRING_POOL_SIZE
+#define STRING_POOL_SIZE 0x8000
+#endif
+#ifndef MAX_TOKENS
+#define MAX_TOKENS 0x200
+#endif
 
 /**
  * Json structures are stored as a flat array of objects holding
  * a link to their parent whose value is their index in that array, index zero being the root
  * Json doesn't require json arrays elements to have an order so sibling data is not stored.
  */
-
 
 #define WHITESPACE \
   X(TABULATION, '\t') \
@@ -155,14 +163,16 @@ struct state {
     int ordinal;
     enum json_errors error;
     int root_index;
-    int token_cursor;
+    unsigned char (*string_pool)[STRING_POOL_SIZE];
+    struct token (*tokens_stack)[MAX_TOKENS];
     int string_cursor;
+    int token_cursor;
 #ifdef WANT_JSON1
     enum json_mode mode;
 #endif
 };
 
-EXPORT int rjson(unsigned char*, size_t len, struct state*, void** );
+EXPORT int rjson(unsigned char*, size_t len, struct state*);
 void print_debug(struct state * state);
 char * to_string(struct token[0x200], int);
 
