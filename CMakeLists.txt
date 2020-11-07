@@ -4,13 +4,17 @@ project(json C)
 set(CMAKE_C_STANDARD 90)
 
 add_library(njson SHARED json.h njson.c)
-add_executable(main main.c)
-target_link_libraries(main njson)
 
+
+option(RUN_TESTS "Build an executable that checks the library works on your machine (recommanded)" ON)
+if(RUN_TESTS)
+    add_executable(main tests.c)
+    target_link_libraries(main njson)
+endif()
 
 option(WANT_SINGLE_HEADER_LIB "Generate a single header file by concatenating 2 files." ON)
 if(WANT_SINGLE_HEADER_LIB)
-    include(concat.cmake OPTIONAL)
+    include(concat.cmake OPTIONAL)  # todo add it as pre-commit hook
 endif()
 
 option(WANT_JSON1 "Add JSON 1 support." OFF)

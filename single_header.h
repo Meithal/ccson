@@ -1,4 +1,5 @@
-/* Automatically generated, do not edit. */
+/* Automatically generated to be used as a single header replacement
+ * of the full library, do not edit. */
 #ifndef JSON_JSON_H
 #define JSON_JSON_H
 #include<string.h>
