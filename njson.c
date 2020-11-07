@@ -45,14 +45,13 @@ EXPORT int rjson(unsigned char* string, size_t len, struct state* state) {
     struct token (*tokens)[MAX_TOKENS] = &state->tokens_stack;
     PUSH_TOKEN(ROOT, NULL, state);
 
-    // fixme: autogenerate single header
     // fixme: complete example with self managed memory.
-    // fixme: extended ascii
-    // todo: make fully reentrant
+    // todo: fully test reentrance
     // todo: make ANSI/STDC compatible
     // todo: make libc optional
     // todo: complete unicode support?
     // todo: add jasmine mode? aka not copy strings+numbers ?
+    // fixme: Transform control characters and escape sequence only when displaying, helps compat with jasmine
 
     if (state->ordinal == 0) {
         state->error = JSON_ERROR_NO_ERRORS;
