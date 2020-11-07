@@ -43,8 +43,6 @@ struct token {
     void * address;
 };
 #ifndef SELF_MANAGE_MEMORY
-unsigned char string_pool__[STRING_POOL_SIZE];
-struct token tokens__[MAX_TOKENS] = {{.kind=UNSET}};
 #endif
 #ifndef STRING_POOL_SIZE
 #define STRING_POOL_SIZE 0x2000
@@ -176,6 +174,9 @@ EXPORT void push_token(enum kind , void * , struct token (*), int * , int);
 #define PUSH_ROOT(state_) push_root(&(state_)->root_index, &(state_)->token_cursor)
 #define PUSH_TOKEN(kind_, address_, state_) push_token((kind_), (address_), (state_)->tokens_stack, &(state_)->token_cursor, (state_)->root_index)
 #define PUSH_STRING_TOKEN(kind_, state_) PUSH_TOKEN((kind_), (state_)->string_pool + (state_)->string_cursor, (state_))
+struct state ez_state__ = {.tokens_stack[0].kind=UNSET};
+#define tokenize(string_) ((void)rjson((unsigned char*)(string_), (size_t)strlen(string_), ((void)memset(&ez_state__, 0, sizeof ez_state__), &ez_state__)), (ez_state__).tokens_stack)
+#define serialize(paste_) to_string(paste_, (ez_state__).token_cursor)
 
 #endif //JSON_JSON_H
 

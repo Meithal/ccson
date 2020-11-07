@@ -218,10 +218,10 @@ int main(void) {
 
     for (i = 0; i < sizeof(valid_json) / sizeof(valid_json[0]) ; i++) {
         struct state state = {0};
-        int res = rjson((unsigned char*)valid_json[i], strlen(valid_json[i]), &state);
+        rjson((unsigned char*)valid_json[i], strlen(valid_json[i]), &state);
         printf("For >>> %s <<<, \n -> %s\n", valid_json[i], json_errors[state.error]);
         puts(print_debug(&state));
-        puts(to_string(state.tokens_stack, res));
+        puts(to_string(state.tokens_stack, state.token_cursor));
         fflush(stdout);
         assert(state.error == JSON_ERROR_NO_ERRORS);
     }
@@ -231,10 +231,10 @@ int main(void) {
     for (i = 0; i < sizeof(bogus_json) / sizeof(bogus_json[0]) ; i++) {
 
         struct state state = {0};
-        int res = rjson((unsigned char*)bogus_json[i], strlen(bogus_json[i]), &state);
+        rjson((unsigned char*)bogus_json[i], strlen(bogus_json[i]), &state);
         printf("For >>> %s <<<, \n -> %s\n", bogus_json[i], json_errors[state.error]);
         puts(print_debug(&state));
-        puts(to_string(state.tokens_stack, res));
+        puts(to_string(state.tokens_stack, state.token_cursor));
         fflush(stdout);
         assert(state.error != JSON_ERROR_NO_ERRORS);
     }
@@ -244,10 +244,10 @@ int main(void) {
     for (i = 0; i < sizeof(bin_safe_json) / sizeof(bin_safe_json[0]) ; i++) {
 
         struct state state = {0};
-        int res = rjson((unsigned char*)bin_safe_json[i].str, bin_safe_json[i].size, &state);
+        rjson((unsigned char*)bin_safe_json[i].str, bin_safe_json[i].size, &state);
         printf("For >>> %s <<<, \n -> %s\n", bin_safe_json[i].str, json_errors[state.error]);
         puts(print_debug(&state));
-        puts(to_string(state.tokens_stack, res));
+        puts(to_string(state.tokens_stack, state.token_cursor));
         fflush(stdout);
         assert(state.error != JSON_ERROR_NO_ERRORS);
     }
@@ -294,7 +294,12 @@ int main(void) {
     START_STRING(&state);
     PUSH_STRING(&state, "4", 1);
     PUSH_STRING_TOKEN(NUMBER, &state);
-
     puts(to_string(state.tokens_stack, state.token_cursor));
+
+    puts("\n\n\n*** EZ JSON ***");
+    assert(strcmp(serialize(tokenize("42")), "42") == 0);
+    puts("OK");
+    puts(serialize(tokenize("[1, 2, {\"4\": 5, \"4\": 6, \"4\": 5 }]")));
+
     return 0;
 }

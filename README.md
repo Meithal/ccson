@@ -4,7 +4,7 @@
 
 ## How to use
 ```C
-#include "json.h"
+#include "json_single_header.h"
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
