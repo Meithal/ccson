@@ -167,7 +167,7 @@ EXPORT void push_string(const unsigned char *, unsigned char [STRING_POOL_SIZE],
 EXPORT void close_root(struct token *, int *);
 EXPORT void push_root(int *, const int *);
 EXPORT void push_token(enum kind , void * , struct token (*), int * , int);
-/* __/ */
+/* EZ JSON */
 #define START_STRING(state_) start_string(&(state_)->string_cursor, (state_)->string_pool)
 #define PUSH_STRING(state_, string_, length_) push_string(&(state_)->string_cursor, (state_)->string_pool, (string_), (length_))
 #define CLOSE_ROOT(state_) close_root((*state_).tokens_stack, &(*state_).root_index)
@@ -177,8 +177,9 @@ EXPORT void push_token(enum kind , void * , struct token (*), int * , int);
 struct state ez_state__ = {.tokens_stack[0].kind=UNSET};
 #define tokenize(string_) ((void)rjson((unsigned char*)(string_), (size_t)strlen(string_), ((void)memset(&ez_state__, 0, sizeof ez_state__), &ez_state__)), (ez_state__).tokens_stack)
 #define serialize(paste_) to_string(paste_, (ez_state__).token_cursor)
+/* __/ */
 
-#endif //JSON_JSON_H
+/* Stripped header guard. */
 
 
 int static inline len_whitespace(unsigned char* string, struct state * state) {
@@ -253,9 +254,8 @@ EXPORT int rjson(unsigned char* string, size_t len, struct state* state) {
 
             case EXPECT_VALUE:
             {
-                if (strncmp("true", (char*)string + state->ordinal, strlen("true")) == 0) {
-//                    PUSH_TOKEN(TRUE, NULL, state);
-                    push_token((TRUE), (((void *) 0)), (state)->tokens_stack, &(state)->token_cursor, (state)->root_index);
+                if (strncmp("true", (char*)string + state->ordinal, strlen("true")) == 0) { // fixme
+                    PUSH_TOKEN(TRUE, NULL, state);
                     SET_STATE_AND_ADVANCE_BY(WHITESPACE_AFTER_VALUE, strlen("true"));
                 }
                 else if (strncmp("false", (char*)string + state->ordinal, strlen("false")) == 0) {
@@ -732,3 +732,5 @@ EXPORT char * to_string(struct token tokens_[0x200], int max) {
     snprintf(output + cursor, 1, "");
     return output;
 }
+
+#endif //JSON_JSON_H /* Automatically added header guard. */
