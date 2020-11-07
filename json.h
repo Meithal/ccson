@@ -1,7 +1,9 @@
 #ifndef JSON_JSON_H
 #define JSON_JSON_H
-#include<string.h>
+#ifdef WANT_LIBC
 #include<stdio.h>
+#include<string.h>
+#endif
 
 
 #if (!(defined(_WIN32) || defined(_WIN64)) \
@@ -21,6 +23,44 @@
 #define size_t unsigned long long
 #define NULL ((void *)0)
 #endif
+
+#ifndef WANT_LIBC
+/* from muslC */
+EXPORT size_t cisson_strlen(const char *s)
+{
+    const char *a = s;
+    for (; *s; s++);
+    return s-a;
+}
+#define cs_strlen(s) (cisson_strlen((s)))
+
+/* from muslC */
+EXPORT void * cisson_memset(void *dest, int c, size_t n)
+{
+    unsigned char *s = dest;
+
+    for (; n; n--, s++) *s = c;
+    return dest;
+}
+#define cs_memset(dest, val, repeat) (cisson_memset((dest), (val), (repeat)))
+
+/* from muslC */
+EXPORT void *cisson_memcpy(void *restrict dest, const void *restrict src, size_t n)
+{
+    unsigned char *d = dest;
+    const unsigned char *s = src;
+
+    for (; n; n--) *d++ = *s++;
+    return dest;
+}
+#define cs_memcpy(dest, val, repeat) (cisson_memcpy((dest), (val), (repeat)))
+#else
+#define cs_strlen(s) (strlen((s)))
+#define cs_memset(dest, val, repeat) (memset((dest), (val), (repeat)))
+#define cs_memcpy(dest, val, repeat) (memcpy((dest), (val), (repeat)))
+
+#endif  /* WANT_LIBC */
+
 
 /*****************************************************/
 
@@ -142,7 +182,7 @@ enum json_mode {
 
 struct state {
     enum states kind;
-    int ordinal;
+    size_t ordinal;
     enum json_errors error;
     int root_index;
     unsigned char string_pool[STRING_POOL_SIZE];
@@ -165,7 +205,7 @@ EXPORT void push_string(const unsigned char *, unsigned char [STRING_POOL_SIZE],
 EXPORT void close_root(struct token *, int *);
 EXPORT void push_root(int *, const int *);
 EXPORT void push_token(enum kind , void * , struct token (*), int * , int);
-/* __/ */
+/* EZ JSON */
 #define START_STRING(state_) start_string(&(state_)->string_cursor, (state_)->string_pool)
 #define PUSH_STRING(state_, string_, length_) push_string(&(state_)->string_cursor, (state_)->string_pool, (string_), (length_))
 #define CLOSE_ROOT(state_) close_root((*state_).tokens_stack, &(*state_).root_index)
@@ -173,7 +213,8 @@ EXPORT void push_token(enum kind , void * , struct token (*), int * , int);
 #define PUSH_TOKEN(kind_, address_, state_) push_token((kind_), (address_), (state_)->tokens_stack, &(state_)->token_cursor, (state_)->root_index)
 #define PUSH_STRING_TOKEN(kind_, state_) PUSH_TOKEN((kind_), (state_)->string_pool + (state_)->string_cursor, (state_))
 struct state ez_state__ = {.tokens_stack[0].kind=UNSET};
-#define tokenize(string_) ((void)rjson((unsigned char*)(string_), (size_t)strlen(string_), ((void)memset(&ez_state__, 0, sizeof ez_state__), &ez_state__)), (ez_state__).tokens_stack)
+#define tokenize(string_) ((void)rjson((unsigned char*)(string_), (size_t)cs_strlen(string_), ((void)cs_memset(&ez_state__, 0, sizeof ez_state__), &ez_state__)), (ez_state__).tokens_stack)
 #define serialize(paste_) to_string(paste_, (ez_state__).token_cursor)
+/* __/ */
 
 #endif //JSON_JSON_H

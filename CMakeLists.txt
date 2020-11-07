@@ -31,3 +31,8 @@ else()
     add_compile_definitions("STRING_POOL_SIZE=$CACHE{STRING_POOL_SIZE}")
     add_compile_definitions("MAX_TOKENS=$CACHE{MAX_TOKENS}")
 endif()
+
+option(WANT_LIBC "Use LibC." ON)
+if(WANT_LIBC)
+    add_compile_definitions("WANT_LIBC")
+endif()

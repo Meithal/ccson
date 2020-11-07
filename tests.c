@@ -1,6 +1,7 @@
 #include "json.h"
 #include <stdio.h>
 #include <assert.h>
+#include <string.h>
 
 char * valid_json[] = {
     "true",
@@ -218,7 +219,7 @@ int main(void) {
 
     for (i = 0; i < sizeof(valid_json) / sizeof(valid_json[0]) ; i++) {
         struct state state = {0};
-        rjson((unsigned char*)valid_json[i], strlen(valid_json[i]), &state);
+        rjson((unsigned char*)valid_json[i], cs_strlen(valid_json[i]), &state);
         printf("For >>> %s <<<, \n -> %s\n", valid_json[i], json_errors[state.error]);
         puts(print_debug(&state));
         puts(to_string(state.tokens_stack, state.token_cursor));
@@ -231,7 +232,7 @@ int main(void) {
     for (i = 0; i < sizeof(bogus_json) / sizeof(bogus_json[0]) ; i++) {
 
         struct state state = {0};
-        rjson((unsigned char*)bogus_json[i], strlen(bogus_json[i]), &state);
+        rjson((unsigned char*)bogus_json[i], cs_strlen(bogus_json[i]), &state);
         printf("For >>> %s <<<, \n -> %s\n", bogus_json[i], json_errors[state.error]);
         puts(print_debug(&state));
         puts(to_string(state.tokens_stack, state.token_cursor));
