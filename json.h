@@ -134,8 +134,6 @@ enum states {
     ASSOC_AFTER_INNER_VALUE
 };
 
-char num_to_hex[] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
-
 #ifdef WANT_JSON1
 enum json_mode {
     JSON2,
@@ -149,9 +147,9 @@ struct state {
     int ordinal;
     enum json_errors error;
     int root_index;
-    unsigned char (*string_pool)[STRING_POOL_SIZE];
-    struct token (*tokens_stack)[MAX_TOKENS];
-    int string_cursor;
+    unsigned char string_pool[STRING_POOL_SIZE];
+    struct token tokens_stack[MAX_TOKENS];
+    unsigned char string_cursor;
     int token_cursor;
 #ifdef WANT_JSON1
     enum json_mode mode;
@@ -161,14 +159,20 @@ struct state {
 /* Parsing */
 EXPORT int rjson(unsigned char*, size_t len, struct state*);
 /* Output */
-EXPORT char* print_debug(struct state * state);
+EXPORT char* print_debug(struct state * );
 EXPORT char* to_string(struct token[0x200], int);
 /* Building */
-EXPORT void start_string(struct state * state);
-EXPORT void push_string(struct state* state, char* string, int length);
-EXPORT void close_root(struct state * state);
-EXPORT void push_root(struct state * state);
-EXPORT void push_token(enum kind kind, void * address, struct state * state);
+EXPORT void start_string(unsigned char *, const unsigned char [STRING_POOL_SIZE]);
+EXPORT void push_string(const unsigned char *, unsigned char [STRING_POOL_SIZE], char* string, int length);
+EXPORT void close_root(struct token *, int *);
+EXPORT void push_root(int *, const int *);
+EXPORT void push_token(enum kind , void * , struct token (*), int * , int);
 /* __/ */
+#define START_STRING(state_) start_string(&(state_)->string_cursor, (state_)->string_pool)
+#define PUSH_STRING(state_, string_, length_) push_string(&(state_)->string_cursor, (state_)->string_pool, (string_), (length_))
+#define CLOSE_ROOT(state_) close_root((*state_).tokens_stack, &(*state_).root_index)
+#define PUSH_ROOT(state_) push_root(&(state_)->root_index, &(state_)->token_cursor)
+#define PUSH_TOKEN(kind_, address_, state_) push_token((kind_), (address_), (state_)->tokens_stack, &(state_)->token_cursor, (state_)->root_index)
+#define PUSH_STRING_TOKEN(kind_, state_) PUSH_TOKEN((kind_), (state_)->string_pool + (state_)->string_cursor, (state_))
 
 #endif //JSON_JSON_H

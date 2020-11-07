@@ -46,7 +46,7 @@ char * valid_json[] = {
     "[1, 2, 3  ]",
     "[1, 2, 3  ]  ",
     " \" à random string é with lower block characters.\"",
-//    " \" \u1011 random string é with \u1011 correctly encoded null byte\"",
+//    " \" \u1011 random string with \u1011 correctly encoded null byte\"",
     " \" a random string with \\u0000 correctly encoded null byte.\"",
     "{\r\n\t "
         "\"foo\": \"bar\""
@@ -221,7 +221,7 @@ int main(void) {
         int res = rjson((unsigned char*)valid_json[i], strlen(valid_json[i]), &state);
         printf("For >>> %s <<<, \n -> %s\n", valid_json[i], json_errors[state.error]);
         puts(print_debug(&state));
-        puts(to_string(*(state.tokens_stack), res));
+        puts(to_string(state.tokens_stack, res));
         fflush(stdout);
         assert(state.error == JSON_ERROR_NO_ERRORS);
     }
@@ -234,7 +234,7 @@ int main(void) {
         int res = rjson((unsigned char*)bogus_json[i], strlen(bogus_json[i]), &state);
         printf("For >>> %s <<<, \n -> %s\n", bogus_json[i], json_errors[state.error]);
         puts(print_debug(&state));
-        puts(to_string(*(state.tokens_stack), res));
+        puts(to_string(state.tokens_stack, res));
         fflush(stdout);
         assert(state.error != JSON_ERROR_NO_ERRORS);
     }
@@ -247,7 +247,7 @@ int main(void) {
         int res = rjson((unsigned char*)bin_safe_json[i].str, bin_safe_json[i].size, &state);
         printf("For >>> %s <<<, \n -> %s\n", bin_safe_json[i].str, json_errors[state.error]);
         puts(print_debug(&state));
-        puts(to_string(*(state.tokens_stack), res));
+        puts(to_string(state.tokens_stack, res));
         fflush(stdout);
         assert(state.error != JSON_ERROR_NO_ERRORS);
     }
@@ -269,35 +269,32 @@ int main(void) {
 
     /* "[1, 2, \"foo\", [1, 2], 4  ]  ", */
     puts("\n\n\n*** EX NIHILO ***");
-    struct state state = {
-        .tokens_stack = &(struct token[MAX_TOKENS]) {0},
-        .string_pool = &(unsigned char [STRING_POOL_SIZE]) {0}
-    };
-    push_token(ROOT, NULL, &state);
-    push_token(ARRAY, NULL, &state);
-    push_root(&state);
-    start_string(&state);
-    push_string(&state, "1", 1);
-    push_token(NUMBER, *state.string_pool + state.string_cursor, &state);
-    start_string(&state);
-    push_string(&state, "2", 1);
-    push_token(NUMBER, *state.string_pool + state.string_cursor, &state);
-    start_string(&state);
-    push_string(&state, "foo", 3);
-    push_token(STRING, *state.string_pool + state.string_cursor, &state);
-    push_token(ARRAY, NULL, &state);
-    push_root(&state);
-    start_string(&state);
-    push_string(&state, "1", 1);
-    push_token(NUMBER, *state.string_pool + state.string_cursor, &state);
-    start_string(&state);
-    push_string(&state, "2", 1);
-    push_token(NUMBER, *state.string_pool + state.string_cursor, &state);
-    close_root(&state);
-    start_string(&state);
-    push_string(&state, "4", 1);
-    push_token(NUMBER, *state.string_pool + state.string_cursor, &state);
+    struct state state = {0};
+    PUSH_TOKEN(ROOT, NULL, &state);
+    PUSH_TOKEN(ARRAY, NULL, &state);
+    PUSH_ROOT(&state);
+    START_STRING(&state);
+    PUSH_STRING(&state, "1", 1);
+    PUSH_STRING_TOKEN(NUMBER, &state);
+    START_STRING(&state);
+    PUSH_STRING(&state, "2", 1);
+    PUSH_STRING_TOKEN(NUMBER, &state);
+    START_STRING(&state);
+    PUSH_STRING(&state, "foo", 3);
+    PUSH_STRING_TOKEN(STRING, &state);
+    PUSH_TOKEN(ARRAY, NULL, &state);
+    PUSH_ROOT(&state);
+    START_STRING(&state);
+    PUSH_STRING(&state, "1", 1);
+    PUSH_STRING_TOKEN(NUMBER, &state);
+    START_STRING(&state);
+    PUSH_STRING(&state, "2", 1);
+    PUSH_STRING_TOKEN(NUMBER, &state);
+    CLOSE_ROOT(&state);
+    START_STRING(&state);
+    PUSH_STRING(&state, "4", 1);
+    PUSH_STRING_TOKEN(NUMBER, &state);
 
-    puts(to_string(*(state.tokens_stack), state.token_cursor));
+    puts(to_string(state.tokens_stack, state.token_cursor));
     return 0;
 }

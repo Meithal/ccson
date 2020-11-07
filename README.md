@@ -27,8 +27,8 @@ int main(void) {
         struct state state = {0};
         int res = rjson(valid_json[i], strlen(valid_json[i]), &state);
         printf("For >>> %s <<<, \n -> %s\n", valid_json[i], json_errors[state.error]);
-        print_debug();
-        puts(to_string(*(state.tokens_stack), res));
+        puts(print_debug(&state));
+        puts(to_string(state.tokens_stack, res));
         assert(state.error == JSON_ERROR_NO_ERRORS);
     }
     return 0;
@@ -47,7 +47,7 @@ By default uses a small pool of static memory that should
 cover most use cases. The size can be customized or disabled completely 
 if you want to supply it your own buffers (from eg. malloc).
 
-Strings are binary safe. Even if null characters (eg \0) are not allowed
+Strings are binary safe. Even if null characters (`\0`) are not allowed
 in JSON documents, the size of strings is stored apart. The numbers are also
  stored as strings, it is let to the user to translate them
  to natives values using `strtod` or a big numbers library.
@@ -76,7 +76,7 @@ with subsequent outputs to produce a valid document.
 
 
 ## Binary safe
-Handles strings with NUL (`\0`) bytes.
+This library is binary safe.
 
 
 ## Fast
@@ -90,7 +90,8 @@ If you maintain an external hashmap of fully qualified identifiers
  require object keys to be unique so a query with a fqn doesn't 
  make a lot of sense.
 
-This library does a full copy of strings and numbers.
+Unlike [JSMN](https://github.com/zserge/jsmn), this library does a full 
+copy of strings and numbers.
 This makes reentry easier as you can clear the original buffer
 between passes, in cost of some speed. 
 It will also convert control characters in their escaped 
