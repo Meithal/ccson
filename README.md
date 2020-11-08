@@ -56,12 +56,7 @@ in JSON documents, the size of strings is stored apart. The numbers are also
 ## Minimal footprint
 Written in ANSI C (tests and stringifier are in C99). 
 Compiles by default into a shared library (DLL, .so). Can be used 
-header only. LibC is optional (disabled by default). 
-Should be cross platform (not tested).
-
-On failure the parser returns the number of successfully parsed tokens
-and a specific error message. That lets you to fix your entry stream
-before trying again.
+header only without any dependency (even stdlib).
 
 
 ## Reentrant

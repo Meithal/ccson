@@ -286,8 +286,6 @@ EXPORT int rjson(unsigned char* string, size_t len, struct state* state) {
                     SET_STATE_AND_ADVANCE_BY(EXPONENT_EXPECT_PLUS_MINUS, 1);
                 } else {
                     PUSH_STRING_TOKEN(NUMBER, state);
-//                    push_token(((NUMBER)), ((state)->string_pool + (state)->string_cursor), ((state))->tokens_stack,
-//                               &((state))->token_cursor, ((state))->root_index);
                     SET_STATE_AND_ADVANCE_BY(WHITESPACE_AFTER_VALUE, 0);
                 }
 
@@ -424,27 +422,27 @@ EXPORT int rjson(unsigned char* string, size_t len, struct state* state) {
 }
 
 #ifdef WANT_LIBC
+static char output[STRING_POOL_SIZE];
 EXPORT char* print_debug(struct state * state) {
     int j;
     int cursor = 0;
     struct token *tokens = state->tokens_stack;
 
-    static char output[STRING_POOL_SIZE];
+    memset(output, 0, sizeof(output));
     for (j = 0; j < state->token_cursor; ++j) {
-        cursor += snprintf(output, 80, "%d: kind: %s, root: %d", j, (char*[]){
-                "UNSET", "ROOT", "TRUE", "FALSE", "JSON_NULL",
-                "STRING", "NUMBER", "ARRAY", "OBJECT"
-        }[tokens[j].kind],
-                tokens[j].root_index);
-        if(tokens[j].kind == STRING || tokens[j].kind == NUMBER) {
-            char dest[STRING_POOL_SIZE] = {0};
-            cursor += snprintf(output + cursor, 80,", value: %s",
-                   (char*)memcpy(dest, (char*)(tokens[j].address)+1, *((char*)tokens[j].address))
-                   );
-        }
+        char dest[STRING_POOL_SIZE] = {0};
+
+        cursor += snprintf(
+                output + cursor, 80,
+                "%d: kind: %s, root: %d, value: %s\\n\"\n", j, (char*[]){
+                            "UNSET", "ROOT", "TRUE", "FALSE", "JSON_NULL",
+                            "STRING", "NUMBER", "ARRAY", "OBJECT"
+                    }[tokens[j].kind],
+                tokens[j].root_index,
+                (char*)memcpy(dest, (char*)(tokens[j].address)+1, *((char*)tokens[j].address))
+        );
     }
 
-    output[cursor] = '\0';
     return output;
 }
 #endif
@@ -504,23 +502,11 @@ EXPORT size_t shortest_safe_string(unsigned char * target, const unsigned char *
     return target - start;
 }
 
-static inline size_t get_length(struct token *token) {
-    return (int[]){
-        [UNSET] = 0, [ROOT] = 0,
-        [TRUE] = sizeof("true") - 1,
-        [FALSE] = sizeof("false") - 1,
-        [JSON_NULL] = sizeof("null") - 1,
-        [STRING] = *((char*)token->address),
-        [NUMBER] = *((char*)token->address),
-        [ARRAY] = 1, [OBJECT] = 1
-    }[token->kind];
-}
-
 EXPORT unsigned char *to_string_(struct token tokens[MAX_TOKENS], int max, int compact) {
     // todo: make the caller handle the buffer
 
 #define cat(where, string, token) (\
-    shortest_safe_string((where), (string), get_length((token))\
+    shortest_safe_string((where), (string), *((char*)(token)->address)\
 ))
 #define cat_raw(where, string) (cs_memcpy((where), (string), cs_strlen((string))), cs_strlen((string)))
 
