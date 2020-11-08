@@ -13,6 +13,12 @@
 #define HAS_VLA
 #endif
 
+#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
+#define res restrict
+#else
+#define res
+#endif
+
 
 #ifdef HAS_VLA
 #define EXPORT extern
@@ -178,7 +184,7 @@ enum json_mode {
 
 struct state {
     enum states cur_state;
-    unsigned char * cursor;
+    unsigned char * res cursor;
     enum json_errors error;
     int root_index;
     unsigned char string_pool[STRING_POOL_SIZE];
@@ -200,15 +206,15 @@ EXPORT char* print_debug(struct tokens * );
 #else
 #define print_debug(_) ""
 #endif
-EXPORT unsigned char *to_string_(struct tokens *tokens, int compact);
-#define to_string(tokens_) (char *)to_string_(tokens_, 0)
-#define to_string_compact(tokens_) (char *)to_string_(tokens_, 1)
+EXPORT unsigned char * res to_string_(struct tokens * res tokens, int compact);
+#define to_string(tokens_) (char * res)to_string_(tokens_, 0)
+#define to_string_compact(tokens_) (char * res)to_string_(tokens_, 1)
 /* Building */
 EXPORT void start_string(unsigned int *, const unsigned char [STRING_POOL_SIZE]);
-EXPORT void push_string(const unsigned int *cursor, unsigned char *pool, char* string, int length);
-EXPORT void close_root(struct token *, int *);
-EXPORT void push_root(int *, const int *);
-EXPORT void push_token(enum kind , void * , struct token (*), int * , int);
+EXPORT void push_string(const unsigned int * res cursor, unsigned char * res pool, char* res string, int length);
+EXPORT void close_root(struct token * res, int * res);
+EXPORT void push_root(int * res, const int * res);
+EXPORT void push_token(enum kind , void * res, struct token (* res), int * res, int);
 /* EZ JSON */
 #define START_STRING(state_) start_string(&(state_)->string_cursor, (state_)->string_pool)
 #define PUSH_STRING(state_, string_, length_) push_string(&(state_)->string_cursor, (state_)->string_pool, (string_), (length_))

@@ -3,57 +3,61 @@
 #include <assert.h>
 #include <string.h>
 
-char * valid_json[] = {
-    "true",
-    "true  ",
-    "  \t  true  ",
-    "  \t  true",
-    "10",
-    "-0",
-    "1",
-    "123",
-    "1203.4",
-    "123.0",
-    "123.05",
-    "0.12",
-    "-0.12",
-    "-0.12e1",
-    "-0e3",
-    "-0e-3",
-    "123.0e12",
-    "12e0",
-    "12e000000012",
-    "12e+0",
-    "12e-0",
-    "12e1",
-    "-12e1",
-    "12e01",
-    "12e+01",
-    "-12e+01",
-    "12e-01",
-    "-12e-01",
-    "-12.34e+25",
-    "-12.34E+25",
-    "-12.34E-25",
-    "-12.34e25",
-    "\"foo\"",
-    "false",
-    "null",
-    " \" a random string\"",
-    "[1, 2, \"foo\", [1, 2], 4  ]  ",
-    "[1, 2, 3]",
-    "[1, \"2\", 3, \"\", \"\", \"foo\"]",
-    "[1 , 2 , 3 ]",
-    "[1, 2, 3  ]",
-    "[1, 2, 3  ]  ",
-    " \" à random string é with lower block characters.\"",
-//    " \" \u1011 random string with \u1011 correctly encoded null byte\"",
-    " \" a random string with \\u0000 correctly encoded null byte.\"",
+struct {
+    char * str;
+    char * ref;
+} valid_json[] = {
+    "true", "true",
+    "true  ", "true",
+    "  \t  true  ", "true",
+    "  \t  true", "true",
+    "10", "10",
+    "-0", "-0",
+    "1", "1",
+    "123", "123",
+    "1203.4", "1203.4",
+    "123.0", "123.0",
+    "123.05", "123.05",
+    "0.12", "0.12",
+    "-0.12", "-0.12",
+    "-0.12e1", "-0.12e1",
+    "-0e3", "-0e3",
+    "-0e-3", "-0e-3",
+    "123.0e12", "123.0e12",
+    "12e0", "12e0",
+    "12e000000012", "12e000000012",
+    "12e000000000", "12e000000000",
+    "12e+0", "12e+0",
+    "12e-0", "12e-0",
+    "12e1", "12e1",
+    "-12e1", "-12e1",
+    "12e01", "12e01",
+    "12e+01", "12e+01",
+    "-12e+01", "-12e+01",
+    "12e-01", "12e-01",
+    "-12e-01", "-12e-01",
+    "-12.34e+25", "-12.34e+25",
+    "-12.34E+25", "-12.34E+25",
+    "-12.34E-25", "-12.34E-25",
+    "-12.34e25", "-12.34e25",
+    "\"foo\"", "\"foo\"",
+    "false", "false",
+    "null", "null",
+    " \" a random string\"", "\" a random string\"",
+    "[1, 2, \"foo\", [1, 2], 4  ]  ", "[1,2,\"foo\",[1,2],4]",
+    "[1, 2, 3]", "[1,2,3]",
+    "[1, \"2\", 3, \"\", \"\", \"foo\"]", "[1,\"2\",3,\"\",\"\",\"foo\"]",
+    "[1 , 2 , 3 ]", "[1,2,3]",
+    "[1, 2, 3  ]", "[1,2,3]",
+    "[1, 2, 3  ]  ", "[1,2,3]",
+    " \" à random string é with lower block characters.\"", "\" à random string é with lower block characters.\"",
+    " \" \u1011 random string with \u1011 correctly encoded null byte\"", "___",
+    " \" a random string with \\u0000 correctly encoded null byte.\"", "\" a random string with \\u0000 correctly encoded null byte.\"",
     "{\r\n\t "
         "\"foo\": \"bar\""
-    "}",
-    "{\"foo\": 1, \"bar\": \"foo\"}",
-    "[1, 2, \"foo\", true]",
+    "}", "{\"foo\":\"bar\"}",
+    "{\"foo\": 1, \"bar\": \"foo\"}", "{\"foo\":1,\"bar\":\"foo\"}",
+    "[1, 2, \"foo\", true]", "[1,2,\"foo\",true]",
     "{"
         "    \"Image\": {"
             "\"Width\":  800,"
@@ -66,7 +70,7 @@ char * valid_json[] = {
             "},"
             "\"IDs\": [116, 943, 234, 38793]"
         "}"
-    "}",
+    "}", "___",
 
     "["
         "{"
@@ -89,15 +93,15 @@ char * valid_json[] = {
             "\"Zip\":       \"94085\","
             "\"Country\":   \"US\""
         "}"
-    "]",
-    "[[[0]]]",
-    "[[[1, 3, [3, 5], 7]], 3]",
-    "{\"foo\": 1, \"foo\": 1, \"foo\": 2, \"foo\": 1}",
-    "\"no\\\\ \\\"white\tspace\"",
-    "\"tést\"",
-    "\"expect shortcuts \\\", \\\\, \\/, \b, \f, \n, \r, \t  \"",
-    "\"no shortcuts \a, \v, \' \047 \"",
-    "\"test 漫 \""
+    "]", "___",
+    "[[[0]]]", "[[[0]]]",
+    "[[[1, 3, [3, 5], 7]], 3]", "[[[1,3,[3,5],7]],3]",
+    "{\"foo\": 1, \"foo\": 1, \"foo\": 2, \"foo\": 1}", "{\"foo\":1,\"foo\":1,\"foo\":2,\"foo\":1}",
+    "\"no\\\\ \\\"white\tspace\"", "\"no\\\\ \\\"white\\tspace\"",
+    "\"tést\"", "\"tést\"",
+    "\"expect shortcuts \\\", \\\\, \\/, \b, \f, \n, \r, \t  \"", "\"expect shortcuts \\\", \\\\, /, \\b, \\f, \\n, \\r, \\t  \"",
+    "\"no shortcuts \a, \v, \' \047 \"", "___",
+    "\"test 漫 \"", "\"test 漫 \"",
 };
 
 struct {
@@ -225,13 +229,16 @@ int main(void) {
     puts("*** ALL SHOULD SUCCEED ***");
 
     for (i = 0; i < sizeof(valid_json) / sizeof(valid_json[0]) ; i++) {
-        struct state state = {.cursor=(unsigned char*)valid_json[i]};
-        rjson(cs_strlen(valid_json[i]), &state);
-        printf("%d: For >>> %s <<<, \n -> %s\n", i, valid_json[i], json_errors[state.error]);
+        struct state state = {.cursor=(unsigned char*)valid_json[i].str};
+        rjson(cs_strlen(valid_json[i].str), &state);
+        printf("%d: For >>> %s <<<, \n -> %s\n", i, valid_json[i].str, json_errors[state.error]);
         puts(print_debug(&state.tokens));
         puts(to_string(&state.tokens));
         fflush(stdout);
         assert(state.error == JSON_ERROR_NO_ERRORS);
+        if(strcmp(valid_json[i].ref, "___") != 0) {
+            assert(strcmp(to_string_compact(&state.tokens), valid_json[i].ref) == 0);
+        }
     }
 
     puts("\n\n\n*** ALL SHOULD FAIL ***");

@@ -11,9 +11,7 @@
 
 char * valid_json[] = {
     "true",
-    "true  ",
     "[1, 2, 3]",
-    "  \t  true",
     "0",
     "-0",
 }
@@ -25,8 +23,8 @@ int main(void) {
 
     for (i = 0; i < sizeof valid_json / sizeof *valid_json) ; i++) {
         struct state state = {.cursor=(unsigned char*)bin_safe_json[i].str};
-        rjson(valid_json[i], strlen(valid_json[i]), &state);
-        puts(to_string(state.tokens_stack, state.token_cursor));
+        rjson(cs_strlen(valid_json[i]), &state);
+        puts(to_string(&state.tokens));
         assert(state.error == JSON_ERROR_NO_ERRORS);
     }
     return 0;
