@@ -180,8 +180,8 @@ enum json_mode {
 #endif
 
 struct state {
-    enum states kind;
-    size_t ordinal;
+    enum states cur_state;
+    unsigned char * cursor;
     enum json_errors error;
     int root_index;
     unsigned char string_pool[STRING_POOL_SIZE];
@@ -194,7 +194,7 @@ struct state {
 };
 
 /* Parsing */
-EXPORT int rjson(unsigned char*, size_t len, struct state*);
+EXPORT int rjson(size_t len, struct state *state);
 /* Output */
 #ifdef WANT_LIBC
 EXPORT char* print_debug(struct state * );

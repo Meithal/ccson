@@ -223,8 +223,8 @@ int main(void) {
     puts("*** ALL SHOULD SUCCEED ***");
 
     for (i = 0; i < sizeof(valid_json) / sizeof(valid_json[0]) ; i++) {
-        struct state state = {0};
-        rjson((unsigned char*)valid_json[i], cs_strlen(valid_json[i]), &state);
+        struct state state = {.cursor=(unsigned char*)valid_json[i]};
+        rjson(cs_strlen(valid_json[i]), &state);
         printf("For >>> %s <<<, \n -> %s\n", valid_json[i], json_errors[state.error]);
         puts(print_debug(&state));
         puts(to_string(state.tokens_stack, state.token_cursor));
@@ -236,8 +236,8 @@ int main(void) {
 
     for (i = 0; i < sizeof(bogus_json) / sizeof(bogus_json[0]) ; i++) {
 
-        struct state state = {0};
-        rjson((unsigned char*)bogus_json[i], cs_strlen(bogus_json[i]), &state);
+        struct state state = {.cursor=(unsigned char*)bogus_json[i]};
+        rjson(cs_strlen(bogus_json[i]), &state);
         printf("For >>> %s <<<, \n -> %s\n", bogus_json[i], json_errors[state.error]);
         puts(print_debug(&state));
         puts(to_string(state.tokens_stack, state.token_cursor));
@@ -249,8 +249,8 @@ int main(void) {
 
     for (i = 0; i < sizeof(bin_safe_json) / sizeof(bin_safe_json[0]) ; i++) {
 
-        struct state state = {0};
-        rjson((unsigned char*)bin_safe_json[i].str, bin_safe_json[i].size, &state);
+        struct state state = {.cursor=(unsigned char*)bin_safe_json[i].str};
+        rjson(bin_safe_json[i].size, &state);
         printf("For >>> %s <<<, \n -> %s\n", bin_safe_json[i].str, json_errors[state.error]);
         puts(print_debug(&state));
         puts(to_string(state.tokens_stack, state.token_cursor));

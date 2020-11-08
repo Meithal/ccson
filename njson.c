@@ -8,44 +8,69 @@ static inline int in(char* hay, unsigned char needle) {
     return 0;
 }
 
-static inline size_t len_whitespace(unsigned char* string, size_t ordinal) {
+static inline size_t
+len_whitespace(unsigned char* string) {
     int count = 0;
-    while(in(whitespaces, string[ordinal + count])) {
+    while(in(whitespaces, string[count])) {
         count++;
     }
     return count;
 }
 
-static inline size_t remaining(size_t max, size_t where) {
+static inline size_t
+remaining(unsigned char *max, unsigned char *where) {
     return max - where;
 }
 
-EXPORT void start_string(unsigned int * cursor, const unsigned char pool[STRING_POOL_SIZE]) {
+EXPORT void
+start_string(unsigned int * cursor,
+             const unsigned char pool[STRING_POOL_SIZE]) {
     *cursor += pool[*cursor] + 1;
 }
 
-EXPORT void push_string(const unsigned int *cursor, unsigned char *pool, char* string, int length) {
+EXPORT void
+push_string(const unsigned int *cursor,
+            unsigned char *pool,
+            char* string,
+            int length) {
     cs_memcpy(pool + *cursor + 1 + pool[*cursor], string, length);
     pool[*cursor] += length;
 }
 
-EXPORT void close_root(struct token * tokens, int * root_index) {
+EXPORT void
+close_root(struct token * tokens,
+        int * root_index) {
     *root_index = tokens[*root_index].root_index;
 }
 
-EXPORT void push_root(int * root_index, const int * token_cursor) {
+EXPORT void
+push_root(int * root_index, const int * token_cursor) {
     *root_index = *token_cursor - 1;
 }
 
-EXPORT void push_token(enum kind kind, void * address, struct token *tokens, int * token_cursor, int root_index) {
-    tokens[(*token_cursor)++] = (struct token) {.kind=kind, .root_index=root_index, .address=address};
+EXPORT void
+push_token(  // fixme
+        enum kind kind,
+        void * address,
+        struct token *tokens,
+        int * token_cursor,
+        int root_index) {
+    tokens[(*token_cursor)++] = (struct token) {
+        .kind=kind, .root_index=root_index, .address=address
+    };
 }
 
-EXPORT int rjson(unsigned char* string, size_t len, struct state* state) {
+EXPORT int
+rjson(size_t len, struct state *state) {
 
-#define peek_at(where) string[state->ordinal + where]
-#define SET_STATE_AND_ADVANCE_BY(which_, advance_) state->kind = which_; state->ordinal += advance_
+#define peek_at(where) state->cursor[where]
+#define SET_STATE_AND_ADVANCE_BY(which_, advance_) \
+    state->cur_state = which_; state->cursor += advance_
+
     struct token (*tokens)[MAX_TOKENS] = &state->tokens_stack;
+
+    tokens[0]->kind = UNSET;
+    unsigned char * final = state->cursor + len;
     START_AND_PUSH_TOKEN(state, ROOT, "#root");
 
     // fixme: complete example with self managed memory.
@@ -55,20 +80,20 @@ EXPORT int rjson(unsigned char* string, size_t len, struct state* state) {
     // todo: add jasmine mode? aka not copy strings+numbers ?
     // todo: pedantic mode?
 
-    if (state->ordinal == 0) {
+    if (state->cursor == 0) {
         state->error = JSON_ERROR_NO_ERRORS;
-        state->kind = WHITESPACE_BEFORE_VALUE;
+        state->cur_state = WHITESPACE_BEFORE_VALUE;
     }
 
     for(;;) {
-        switch (state->kind) {
+        switch (state->cur_state) {
             case WHITESPACE_BEFORE_VALUE: {
-                SET_STATE_AND_ADVANCE_BY(EXPECT_VALUE, len_whitespace(string, state->ordinal));
+                SET_STATE_AND_ADVANCE_BY(EXPECT_VALUE, len_whitespace(state->cursor));
                 break;
             }
 
             case WHITESPACE_AFTER_VALUE: {
-                SET_STATE_AND_ADVANCE_BY(AFTER_VALUE, len_whitespace(string, state->ordinal));
+                SET_STATE_AND_ADVANCE_BY(AFTER_VALUE, len_whitespace(state->cursor));
                 break;
             }
 
@@ -120,7 +145,7 @@ EXPORT int rjson(unsigned char* string, size_t len, struct state* state) {
                 else if (tokens[state->root_index]->kind != ROOT) {
                     state->error = JSON_ERROR_ASSOC_EXPECT_VALUE;
                 }
-                else if (remaining(len, state->ordinal)) {
+                else if (remaining(final, state->cursor)) {
                     state->error = JSON_ERROR_INVALID_CHARACTER;
                 }
                 else {
@@ -132,7 +157,7 @@ EXPORT int rjson(unsigned char* string, size_t len, struct state* state) {
             case AFTER_VALUE:
             {
                 if (state->tokens_stack[state->root_index].kind == ROOT) {
-                    if (remaining(len, state->ordinal)) {
+                    if (remaining(final, state->cursor)) {
                         state->error = JSON_ERROR_NO_SIBLINGS;
 #ifdef WANT_JSON1
                     } else if(state->mode == JSON1 && tokens[state->token_cursor-1].kind != OBJECT) {
@@ -155,9 +180,9 @@ EXPORT int rjson(unsigned char* string, size_t len, struct state* state) {
                 break;
             }
             case OPEN_ARRAY: {
-                if (peek_at(len_whitespace(string, state->ordinal)) == ']') {
+                if (peek_at(len_whitespace(state->cursor)) == ']') {
                     CLOSE_ROOT(state);
-                    SET_STATE_AND_ADVANCE_BY(WHITESPACE_AFTER_VALUE, len_whitespace(string, state->ordinal) + 1);
+                    SET_STATE_AND_ADVANCE_BY(WHITESPACE_AFTER_VALUE, len_whitespace(state->cursor) + 1);
                 } else {
                     SET_STATE_AND_ADVANCE_BY(WHITESPACE_BEFORE_VALUE, 0);
                 }
@@ -165,9 +190,9 @@ EXPORT int rjson(unsigned char* string, size_t len, struct state* state) {
                 break;
             }
             case OPEN_ASSOC: {
-                if (peek_at(len_whitespace(string, state->ordinal)) == '}') {
+                if (peek_at(len_whitespace(state->cursor)) == '}') {
                     CLOSE_ROOT(state);
-                    SET_STATE_AND_ADVANCE_BY(WHITESPACE_AFTER_VALUE, len_whitespace(string, state->ordinal) + 1);
+                    SET_STATE_AND_ADVANCE_BY(WHITESPACE_AFTER_VALUE, len_whitespace(state->cursor) + 1);
                 } else {
                     SET_STATE_AND_ADVANCE_BY(ASSOC_WHITESPACE_BEFORE_KEY, 0);
                 }
@@ -209,7 +234,7 @@ EXPORT int rjson(unsigned char* string, size_t len, struct state* state) {
                         break;
                     }
                     PUSH_STRING(state, "\\u", 2);
-                    PUSH_STRING(state, (char*)string+state->ordinal+1, 4);
+                    PUSH_STRING(state, (char*)state->cursor + 1, 4);
                     SET_STATE_AND_ADVANCE_BY(IN_STRING, 5);
                     break;
                 }
@@ -361,7 +386,7 @@ EXPORT int rjson(unsigned char* string, size_t len, struct state* state) {
                 break;
             }
             case ASSOC_WHITESPACE_BEFORE_KEY: {
-                SET_STATE_AND_ADVANCE_BY(ASSOC_EXPECT_KEY, len_whitespace(string, state->ordinal));
+                SET_STATE_AND_ADVANCE_BY(ASSOC_EXPECT_KEY, len_whitespace(state->cursor));
 
                 break;
             }
@@ -376,7 +401,7 @@ EXPORT int rjson(unsigned char* string, size_t len, struct state* state) {
                 break;
             }
             case ASSOC_AFTER_KEY_WHITESPACE: {
-                SET_STATE_AND_ADVANCE_BY(ASSOC_EXPECT_COLON, len_whitespace(string, state->ordinal));
+                SET_STATE_AND_ADVANCE_BY(ASSOC_EXPECT_COLON, len_whitespace(state->cursor));
 
                 break;
             }

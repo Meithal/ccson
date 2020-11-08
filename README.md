@@ -26,8 +26,6 @@ int main(void) {
     for (i = 0; i < sizeof valid_json / sizeof *valid_json) ; i++) {
         struct state state = {0};
         rjson(valid_json[i], strlen(valid_json[i]), &state);
-        printf("For >>> %s <<<, \n -> %s\n", valid_json[i], json_errors[state.error]);
-        puts(print_debug(&state));
         puts(to_string(state.tokens_stack, state.token_cursor));
         assert(state.error == JSON_ERROR_NO_ERRORS);
     }
