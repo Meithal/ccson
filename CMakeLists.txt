@@ -1,9 +1,32 @@
 cmake_minimum_required(VERSION 3.14)
-project(json C)
+
+find_package(Git QUIET)
+
+execute_process(
+        COMMAND "${GIT_EXECUTABLE}" rev-list --count HEAD
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+        RESULT_VARIABLE _var_res
+        OUTPUT_VARIABLE _var_LAST_COMMIT
+        ERROR_QUIET
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+if(_var_res)
+    set(_var_LAST_COMMIT, "0")
+else()
+    set_property(GLOBAL APPEND
+            PROPERTY CMAKE_CONFIGURE_DEPENDS
+            "${CMAKE_SOURCE_DIR}/.git/index")
+endif()
+
+project(Cisson
+        VERSION "0.0.1.${_var_LAST_COMMIT}"
+        DESCRIPTION "C-(J)SON - aka JSON library in C language."
+        HOMEPAGE_URL "https://gitlab.com/Meithal/cisson"
+        LANGUAGES C)
 
 set(CMAKE_C_STANDARD 90)
 
-add_library(njson SHARED json.h njson.c)
+message(STATUS "${CMAKE_PROJECT_NAME} version ${CMAKE_PROJECT_VERSION}")
 
 
 option(RUN_TESTS "Build an executable that checks the library works on your machine (recommanded)" ON)
@@ -14,7 +37,7 @@ endif()
 
 option(WANT_SINGLE_HEADER_LIB "Generate a single header file by concatenating 2 files." ON)
 if(WANT_SINGLE_HEADER_LIB)
-    include(concat.cmake OPTIONAL)  # todo add it as pre-commit hook
+    include(concat.cmake OPTIONAL)
 endif()
 
 option(WANT_JSON1 "Add JSON 1 support." OFF)
@@ -36,3 +59,6 @@ option(WANT_LIBC "Use LibC." ON)
 if(WANT_LIBC)
     add_compile_definitions("WANT_LIBC")
 endif()
+
+add_library(njson SHARED json.h njson.c)
+
