@@ -278,7 +278,6 @@ EXPORT int rjson(unsigned char* string, size_t len, struct state* state) {
     // todo: make ANSI/STDC compatible
     // todo: complete unicode support?
     // todo: add jasmine mode? aka not copy strings+numbers ?
-    // fixme: Transform control characters and escape sequence only when displaying, helps compat with jasmine
 
     if (state->ordinal == 0) {
         state->error = JSON_ERROR_NO_ERRORS;
@@ -801,7 +800,7 @@ EXPORT unsigned char *to_string_(struct token tokens[MAX_TOKENS], int max, int c
             if (j + 1 < max && (
                 tokens[tokens[j].root_index].kind == STRING || tokens[tokens[j].root_index].kind == ARRAY
             ) && tokens[j].kind != ARRAY && tokens[j].kind != OBJECT) {
-                cursor += cat_raw(output + cursor, compact ? (u8*)"," : (u8*)",\n");
+                cursor += cat_raw(output + cursor, compact ? "," : ",\n");
             }
         }
     }

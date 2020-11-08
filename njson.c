@@ -53,6 +53,7 @@ EXPORT int rjson(unsigned char* string, size_t len, struct state* state) {
     // todo: make ANSI/STDC compatible
     // todo: complete unicode support?
     // todo: add jasmine mode? aka not copy strings+numbers ?
+    // todo: pedantic mode?
 
     if (state->ordinal == 0) {
         state->error = JSON_ERROR_NO_ERRORS;
@@ -448,8 +449,8 @@ EXPORT char* print_debug(struct state * state) {
 }
 #endif
 
-static unsigned char ident_s[0x80];
-static unsigned char * print_ident(int ident, unsigned compact) {
+static char ident_s[0x80];
+static char * print_ident(int ident, unsigned compact) {
     cs_memset(ident_s, ' ', ident * 2 * (compact ^ 1u));
     ident_s[ident * 2 * (compact ^ 1u)] = '\0';
     return ident_s;

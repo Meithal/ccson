@@ -25,10 +25,10 @@ int main(void) {
 
     for (i = 0; i < sizeof valid_json / sizeof *valid_json) ; i++) {
         struct state state = {0};
-        int res = rjson(valid_json[i], strlen(valid_json[i]), &state);
+        rjson(valid_json[i], strlen(valid_json[i]), &state);
         printf("For >>> %s <<<, \n -> %s\n", valid_json[i], json_errors[state.error]);
         puts(print_debug(&state));
-        puts(to_string(state.tokens_stack, res));
+        puts(to_string(state.tokens_stack, state.token_cursor));
         assert(state.error == JSON_ERROR_NO_ERRORS);
     }
     return 0;
@@ -56,7 +56,8 @@ in JSON documents, the size of strings is stored apart. The numbers are also
 ## Minimal footprint
 Written in ANSI C (tests and stringifier are in C99). 
 Compiles by default into a shared library (DLL, .so). Can be used 
-header only, no LibC. Should be cross platform (not tested).
+header only. LibC is optional (disabled by default). 
+Should be cross platform (not tested).
 
 On failure the parser returns the number of successfully parsed tokens
 and a specific error message. That lets you to fix your entry stream
@@ -88,20 +89,13 @@ If you maintain an external hashmap of fully qualified identifiers
  require object keys to be unique so a query with a fqn doesn't 
  make a lot of sense.
 
-Unlike [JSMN](https://github.com/zserge/jsmn), this library does a full 
-copy of strings and numbers.
-This makes reentry easier as you can clear the original buffer
-between passes, in cost of some speed. 
-It will also convert control characters in their escaped 
-unicode form (`\0` becomes `\\u0000`, `\1` becomes `\\u0001`, etc.).
+
+## JSON 1, 2 and >
+Supports JSON 1 and 2, but also tries to follow RFC8259 guidelines.
 
 
-## JSON 1 and 2
-Supports JSON 1 and 2.
-
-
-## utf 8, 16><, 32><
-Has basic utf8 support (only first 128 + 1,920 codepoints).
+## UTF 8, 16><, 32><
+Has basic utf8 support.
 Doesn't support extended ASCII. Doesn't support UTF16 nor UTF32.
 
 
