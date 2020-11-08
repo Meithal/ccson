@@ -197,8 +197,14 @@ struct state {
 /* Parsing */
 EXPORT int rjson(unsigned char*, size_t len, struct state*);
 /* Output */
+#ifdef WANT_LIBC
 EXPORT char* print_debug(struct state * );
-EXPORT char* to_string(struct token[0x200], int);
+#else
+#define print_debug(_) ""
+#endif
+EXPORT char *to_string_(struct token *tokens_, int max, int compact);
+#define to_string(tokens_, max) to_string_(tokens_, max, 0)
+#define to_string_compact(tokens_, max) to_string_(tokens_, max, 1)
 /* Building */
 EXPORT void start_string(unsigned char *, const unsigned char [STRING_POOL_SIZE]);
 EXPORT void push_string(const unsigned char *, unsigned char [STRING_POOL_SIZE], char* string, int length);
@@ -213,7 +219,12 @@ EXPORT void push_token(enum kind , void * , struct token (*), int * , int);
 #define PUSH_TOKEN(kind_, address_, state_) push_token((kind_), (address_), (state_)->tokens_stack, &(state_)->token_cursor, (state_)->root_index)
 #define PUSH_STRING_TOKEN(kind_, state_) PUSH_TOKEN((kind_), (state_)->string_pool + (state_)->string_cursor, (state_))
 struct state ez_state__ = {.tokens_stack[0].kind=UNSET};
-#define tokenize(string_) ((void)rjson((unsigned char*)(string_), (size_t)cs_strlen(string_), ((void)cs_memset(&ez_state__, 0, sizeof ez_state__), &ez_state__)), (ez_state__).tokens_stack)
+#define tokenize(string_) (\
+  (void)rjson((unsigned char*)(string_), \
+  (size_t)cs_strlen(string_), \
+  ((void)cs_memset(&ez_state__, 0, sizeof ez_state__), &ez_state__)) \
+  , (ez_state__).tokens_stack \
+)
 #define serialize(paste_) to_string(paste_, (ez_state__).token_cursor)
 /* __/ */
 

@@ -281,7 +281,7 @@ int main(void) {
     PUSH_STRING(&state, "2", 1);
     PUSH_STRING_TOKEN(NUMBER, &state);
     START_STRING(&state);
-    PUSH_STRING(&state, "foo", 3);
+    PUSH_STRING(&state, "\"foo\"", 5);
     PUSH_STRING_TOKEN(STRING, &state);
     PUSH_TOKEN(ARRAY, NULL, &state);
     PUSH_ROOT(&state);

@@ -199,8 +199,14 @@ struct state {
 /* Parsing */
 EXPORT int rjson(unsigned char*, size_t len, struct state*);
 /* Output */
+#ifdef WANT_LIBC
 EXPORT char* print_debug(struct state * );
-EXPORT char* to_string(struct token[0x200], int);
+#else
+#define print_debug(_) ""
+#endif
+EXPORT char *to_string_(struct token *tokens_, int max, int compact);
+#define to_string(tokens_, max) to_string_(tokens_, max, 0)
+#define to_string_compact(tokens_, max) to_string_(tokens_, max, 1)
 /* Building */
 EXPORT void start_string(unsigned char *, const unsigned char [STRING_POOL_SIZE]);
 EXPORT void push_string(const unsigned char *, unsigned char [STRING_POOL_SIZE], char* string, int length);
@@ -215,7 +221,12 @@ EXPORT void push_token(enum kind , void * , struct token (*), int * , int);
 #define PUSH_TOKEN(kind_, address_, state_) push_token((kind_), (address_), (state_)->tokens_stack, &(state_)->token_cursor, (state_)->root_index)
 #define PUSH_STRING_TOKEN(kind_, state_) PUSH_TOKEN((kind_), (state_)->string_pool + (state_)->string_cursor, (state_))
 struct state ez_state__ = {.tokens_stack[0].kind=UNSET};
-#define tokenize(string_) ((void)rjson((unsigned char*)(string_), (size_t)cs_strlen(string_), ((void)cs_memset(&ez_state__, 0, sizeof ez_state__), &ez_state__)), (ez_state__).tokens_stack)
+#define tokenize(string_) (\
+  (void)rjson((unsigned char*)(string_), \
+  (size_t)cs_strlen(string_), \
+  ((void)cs_memset(&ez_state__, 0, sizeof ez_state__), &ez_state__)) \
+  , (ez_state__).tokens_stack \
+)
 #define serialize(paste_) to_string(paste_, (ez_state__).token_cursor)
 /* __/ */
 
@@ -235,7 +246,6 @@ static inline size_t len_whitespace(unsigned char* string, size_t ordinal) {
     while(in(whitespaces, string[ordinal + count])) {
         count++;
     }
-
     return count;
 }
 
@@ -299,6 +309,7 @@ EXPORT int rjson(unsigned char* string, size_t len, struct state* state) {
             {
                 if (peek_at(0) == '"') {
                     START_STRING(state);
+                    PUSH_STRING(state, "\"", 1);
                     SET_STATE_AND_ADVANCE_BY(FOUND_OPEN_QUOTE, 1);
                 }
                 else if (peek_at(0) == '[') {
@@ -400,6 +411,7 @@ EXPORT int rjson(unsigned char* string, size_t len, struct state* state) {
                 if (peek_at(0) == '\\') {
                     SET_STATE_AND_ADVANCE_BY(LITERAL_ESCAPE, 1);
                 } else if (peek_at(0) == '"') {
+                    PUSH_STRING(state, "\"", 1);
                     SET_STATE_AND_ADVANCE_BY(CLOSE_STRING, 1);
                 } else {
                     SET_STATE_AND_ADVANCE_BY(IN_STRING, 0);
@@ -452,6 +464,7 @@ EXPORT int rjson(unsigned char* string, size_t len, struct state* state) {
                 }
                 else if (peek_at(0) == '"')
                 {
+                    PUSH_STRING(state, "\"", 1);
                     SET_STATE_AND_ADVANCE_BY(CLOSE_STRING, 1);
                 }
                 else if (peek_at(0) == '\b') {
@@ -640,6 +653,7 @@ EXPORT int rjson(unsigned char* string, size_t len, struct state* state) {
             case ASSOC_EXPECT_KEY: {
                 if(peek_at(0) == '"') {
                     START_STRING(state);
+                    PUSH_STRING(state, "\"", 1);
                     SET_STATE_AND_ADVANCE_BY(IN_STRING, 1);
                 } else {
                     state->error = JSON_ERROR_ASSOC_EXPECT_STRING_A_KEY;
@@ -716,22 +730,18 @@ EXPORT char* print_debug(struct state * state) {
     output[cursor] = '\0';
     return output;
 }
-#else
-EXPORT char* print_debug(struct state * state) {
-    return (char*)state->string_pool;
-}
 #endif
 
 static char ident_s[0x80];
-static char * print_ident(int ident) {
+static char * print_ident(int ident, int compact) {
+    if(compact) return "";
     cs_memset(ident_s, ' ', ident * 2);
     ident_s[ident * 2] = '\0';
-
     return ident_s;
 }
 
 
-EXPORT char * to_string(struct token tokens_[0x200], int max) {
+EXPORT char *to_string_(struct token *tokens_, int max, int compact) {
     // todo: make the caller handle the buffer
     // todo: add compact output for tests
 #define cat(where, string) (cs_memcpy((where), (string), cs_strlen((string))), cs_strlen((string)))
@@ -745,9 +755,9 @@ EXPORT char * to_string(struct token tokens_[0x200], int max) {
     int j;
     for (j = 1; j < max; ++j) {
         if (tokens[tokens[j].root_index].kind == STRING) {
-            cursor += cat(output + cursor, ": ");
+            cursor += cat(output + cursor, compact ? ":" : ": ");
         } else {
-            cursor += cat(output + cursor, print_ident(ident));
+            cursor += cat(output + cursor, print_ident(ident, compact));
         }
 
         if (tokens[j].kind == TRUE) cursor += cat(output + cursor, "true");
@@ -758,8 +768,8 @@ EXPORT char * to_string(struct token tokens_[0x200], int max) {
             cs_memcpy(dest, (char*)tokens[j].address + 1, *((char *) tokens[j].address));
             cursor += cat(output + cursor, dest);
         }
-        if (tokens[j].kind == ARRAY) cursor += cat(output + cursor, "[\n"), ident++;
-        if (tokens[j].kind == OBJECT) cursor += cat(output + cursor, "{\n"), ident++;
+        if (tokens[j].kind == ARRAY) cursor += cat(output + cursor, compact ? "[" : "[\n"), ident++;
+        if (tokens[j].kind == OBJECT) cursor += cat(output + cursor, compact ? "{" : "{\n"), ident++;
         if (j <= max) {
             if (tokens[j + 1].root_index < tokens[j].root_index) {
                 if (j + 1 == max
@@ -770,15 +780,15 @@ EXPORT char * to_string(struct token tokens_[0x200], int max) {
                     for (;;) {
 
                         if(tokens[tokens[cur_node].root_index].kind == ARRAY) {
-                            cursor += cat(output + cursor, "\n");
+                            cursor += cat(output + cursor, compact ? "" : "\n");
                             --ident;
-                            cursor += cat(output + cursor, print_ident(ident));
+                            cursor += cat(output + cursor, print_ident(ident, compact));
                             cursor += cat(output + cursor, "]");
                         }
                         else if(tokens[tokens[cur_node].root_index].kind == OBJECT) {
-                            cursor += cat(output + cursor, "\n");
+                            cursor += cat(output + cursor, compact ? "" : "\n");
                             --ident;
-                            cursor += cat(output + cursor, print_ident(ident));
+                            cursor += cat(output + cursor, print_ident(ident, compact));
                             cursor += cat(output + cursor, "}");
                         }
                         if(tokens[(cur_node = tokens[cur_node].root_index)].root_index == target) {
@@ -790,7 +800,7 @@ EXPORT char * to_string(struct token tokens_[0x200], int max) {
             if (j + 1 < max && (
                 tokens[tokens[j].root_index].kind == STRING || tokens[tokens[j].root_index].kind == ARRAY
             ) && tokens[j].kind != ARRAY && tokens[j].kind != OBJECT) {
-                cursor += cat(output + cursor, ",\n");
+                cursor += cat(output + cursor, compact ? "," : ",\n");
             }
         }
     }
