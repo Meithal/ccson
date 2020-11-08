@@ -73,11 +73,11 @@ char * valid_json[] = {
             " \"precision\": \"zip\","
             "\"Latitude\":  37.7668,"
             "                    \"Longitude\": -122.3959,"
-            "                    \"Address\":   \"\","
-            "\"City\":      \"SAN FRANCISCO\","
-            "\"State\":     [\"CA\", {\"foo\": [\"CA\", \"OK\"]}],"
+            "                    \"Address\"\t:   \"\",\t"
+            "\"City\"  :      \"SAN FRANCISCO\","
+            "\"State\":     [\"CA\", {\"foo\": [\"CA\", \"OK\"]}]  ,"
             "\"Zip\":       \"94107\","
-            "\"Country\":   \"US\""
+            "\"Country\":\"US\""
         "},"
         "{"
             "\"precision\": \"zip\","
@@ -119,6 +119,8 @@ char * bogus_json[] = {
     "\r\n\f ",
     "\r\n\f \"\r and \n are valid but \f is invalid whitespace\"",
     "NULL",
+    "nUll",
+    "nul",
     "foo",
     "\1\2\3true\4\5\6",
     "true false",
@@ -225,9 +227,9 @@ int main(void) {
     for (i = 0; i < sizeof(valid_json) / sizeof(valid_json[0]) ; i++) {
         struct state state = {.cursor=(unsigned char*)valid_json[i]};
         rjson(cs_strlen(valid_json[i]), &state);
-        printf("For >>> %s <<<, \n -> %s\n", valid_json[i], json_errors[state.error]);
-        puts(print_debug(&state));
-        puts(to_string(state.tokens_stack, state.token_cursor));
+        printf("%d: For >>> %s <<<, \n -> %s\n", i, valid_json[i], json_errors[state.error]);
+        puts(print_debug(&state.tokens));
+        puts(to_string(&state.tokens));
         fflush(stdout);
         assert(state.error == JSON_ERROR_NO_ERRORS);
     }
@@ -238,9 +240,9 @@ int main(void) {
 
         struct state state = {.cursor=(unsigned char*)bogus_json[i]};
         rjson(cs_strlen(bogus_json[i]), &state);
-        printf("For >>> %s <<<, \n -> %s\n", bogus_json[i], json_errors[state.error]);
-        puts(print_debug(&state));
-        puts(to_string(state.tokens_stack, state.token_cursor));
+        printf("%d: For >>> %s <<<, \n -> %s\n", i, bogus_json[i], json_errors[state.error]);
+        puts(print_debug(&state.tokens));
+        puts(to_string(&state.tokens));
         fflush(stdout);
         assert(state.error != JSON_ERROR_NO_ERRORS);
     }
@@ -252,8 +254,8 @@ int main(void) {
         struct state state = {.cursor=(unsigned char*)bin_safe_json[i].str};
         rjson(bin_safe_json[i].size, &state);
         printf("For >>> %s <<<, \n -> %s\n", bin_safe_json[i].str, json_errors[state.error]);
-        puts(print_debug(&state));
-        puts(to_string(state.tokens_stack, state.token_cursor));
+        puts(print_debug(&state.tokens));
+        puts(to_string(&state.tokens));
         fflush(stdout);
         assert(state.error == JSON_ERROR_NO_ERRORS);
     }
@@ -288,9 +290,9 @@ int main(void) {
     START_AND_PUSH_TOKEN(&state, NUMBER, "2");
     CLOSE_ROOT(&state);
     START_AND_PUSH_TOKEN(&state, NUMBER, "4");
-    puts(to_string(state.tokens_stack, state.token_cursor));
-    puts(to_string_compact(state.tokens_stack, state.token_cursor));
-    assert(strcmp(to_string_compact(state.tokens_stack, state.token_cursor),"[1,2,\"foo\",[1,2],4]") == 0);
+    puts(to_string(&state.tokens));
+    puts(to_string_compact(&state.tokens));
+    assert(strcmp(to_string_compact(&state.tokens),"[1,2,\"foo\",[1,2],4]") == 0);
 
     return 0;
 }

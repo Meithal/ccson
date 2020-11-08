@@ -13,6 +13,7 @@
 #define HAS_VLA
 #endif
 
+
 #ifdef HAS_VLA
 #define EXPORT extern
 #else
@@ -142,8 +143,6 @@ char digits19[] = "123456789";
 char hexdigits[] = "0123456789abcdefABCDEF";
 
 enum states {
-    WHITESPACE_BEFORE_VALUE,
-    WHITESPACE_AFTER_VALUE,
     EXPECT_VALUE,
     AFTER_VALUE,
     OPEN_ARRAY,
@@ -163,9 +162,7 @@ enum states {
     IN_EXPONENT_DIGIT,
     ARRAY_AFTER_VALUE,
     ASSOC_AFTER_VALUE,
-    ASSOC_WHITESPACE_BEFORE_KEY,
     ASSOC_EXPECT_KEY,
-    ASSOC_AFTER_KEY_WHITESPACE,
     CLOSE_STRING,
     ASSOC_EXPECT_COLON,
     ASSOC_AFTER_INNER_VALUE
@@ -185,25 +182,27 @@ struct state {
     enum json_errors error;
     int root_index;
     unsigned char string_pool[STRING_POOL_SIZE];
-    struct token tokens_stack[MAX_TOKENS];
     unsigned int string_cursor;
-    int token_cursor;
+    struct tokens {
+        struct token tokens_stack[MAX_TOKENS];
+        int token_cursor;
+    } tokens;
 #ifdef WANT_JSON1
     enum json_mode mode;
 #endif
 };
 
 /* Parsing */
-EXPORT int rjson(size_t len, struct state *state);
+EXPORT int rjson(size_t len, struct state * state);
 /* Output */
 #ifdef WANT_LIBC
-EXPORT char* print_debug(struct state * );
+EXPORT char* print_debug(struct tokens * );
 #else
 #define print_debug(_) ""
 #endif
-EXPORT unsigned char *to_string_(struct token tokens_[MAX_TOKENS], int max, int compact);
-#define to_string(tokens_, max) (char *)to_string_(tokens_, max, 0)
-#define to_string_compact(tokens_, max) (char *)to_string_(tokens_, max, 1)
+EXPORT unsigned char *to_string_(struct tokens *tokens, int compact);
+#define to_string(tokens_) (char *)to_string_(tokens_, 0)
+#define to_string_compact(tokens_) (char *)to_string_(tokens_, 1)
 /* Building */
 EXPORT void start_string(unsigned int *, const unsigned char [STRING_POOL_SIZE]);
 EXPORT void push_string(const unsigned int *cursor, unsigned char *pool, char* string, int length);
@@ -213,9 +212,9 @@ EXPORT void push_token(enum kind , void * , struct token (*), int * , int);
 /* EZ JSON */
 #define START_STRING(state_) start_string(&(state_)->string_cursor, (state_)->string_pool)
 #define PUSH_STRING(state_, string_, length_) push_string(&(state_)->string_cursor, (state_)->string_pool, (string_), (length_))
-#define CLOSE_ROOT(state_) close_root((*state_).tokens_stack, &(*state_).root_index)
-#define PUSH_ROOT(state_) push_root(&(state_)->root_index, &(state_)->token_cursor)
-#define PUSH_TOKEN(kind_, address_, state_) push_token((kind_), (address_), (state_)->tokens_stack, &(state_)->token_cursor, (state_)->root_index)
+#define CLOSE_ROOT(state_) close_root((*state_).tokens.tokens_stack, &(*state_).root_index)
+#define PUSH_ROOT(state_) push_root(&(state_)->root_index, &(state_)->tokens.token_cursor)
+#define PUSH_TOKEN(kind_, address_, state_) push_token((kind_), (address_), (state_)->tokens.tokens_stack, &(state_)->tokens.token_cursor, (state_)->root_index)
 #define PUSH_STRING_TOKEN(kind_, state_) PUSH_TOKEN((kind_), (state_)->string_pool + (state_)->string_cursor, (state_))
 #define START_AND_PUSH_TOKEN(state, kind, string) START_STRING(state); PUSH_STRING(state, string, (sizeof string) - 1); PUSH_STRING_TOKEN(kind, state)
 /* __/ */

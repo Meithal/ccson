@@ -24,7 +24,7 @@ int main(void) {
     puts("*** ALL SHOULD SUCCEED ***");
 
     for (i = 0; i < sizeof valid_json / sizeof *valid_json) ; i++) {
-        struct state state = {0};
+        struct state state = {.cursor=(unsigned char*)bin_safe_json[i].str};
         rjson(valid_json[i], strlen(valid_json[i]), &state);
         puts(to_string(state.tokens_stack, state.token_cursor));
         assert(state.error == JSON_ERROR_NO_ERRORS);
@@ -36,7 +36,7 @@ int main(void) {
 ```
 
 
-## Sturdy
+## Resilient
 Parsing is single pass and doesn't involve recursion so no risk of 
 stack busting from untrusted input. 
 Covered by almost 200 tests (for both valid and invalid cases). 
@@ -54,7 +54,7 @@ in JSON documents, the size of strings is stored apart. The numbers are also
 ## Minimal footprint
 Written in ANSI C (tests and stringifier are in C99). 
 Compiles by default into a shared library (DLL, .so). Can be used 
-header only without any dependency (even stdlib).
+header only without any dependencies (even stdlib).
 
 
 ## Reentrant
@@ -66,9 +66,14 @@ environment.
 Every stored token is guaranteed to be complete and can be concatenated 
 with subsequent outputs to produce a valid document.
 
+Some tokens cannot be reentered, namely truncated 
+`true`/`false`/`null` tokens, truncated `\uXXXX` escaped
+code points in strings and truncated BOMs.
+
 
 ## Binary safe
-This library is binary safe.
+This library is binary safe in both ways (reads both unescaped
+NULs and encodes them safely).
 
 
 ## Fast
@@ -88,7 +93,7 @@ Supports JSON 1 and 2, but also tries to follow RFC8259 guidelines.
 
 
 ## UTF 8, 16><, 32><
-Has basic utf8 support.
+Supports UTF8.
 Doesn't support extended ASCII. Doesn't support UTF16 nor UTF32.
 
 
