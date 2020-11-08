@@ -95,19 +95,19 @@ char * valid_json[] = {
     "{\"foo\": 1, \"foo\": 1, \"foo\": 2, \"foo\": 1}",
     "\"no\\\\ \\\"white\tspace\"",
     "\"tést\"",
-    "\"expect shortcuts \\\", \\\\, \\/, \b, \f, \n, \r, \r, \t  \"",
+    "\"expect shortcuts \\\", \\\\, \\/, \b, \f, \n, \r, \t  \"",
     "\"no shortcuts \a, \v, \' \047 \"",
-//    "\"test 漫 \""
+    "\"test 漫 \""
 };
 
 struct {
     char * str;
     size_t size;
 } bin_safe_json[] = {
-    {"\"fo\0o\"", sizeof("\"fo\0o\"")},
-    {"\"\0foo\"", sizeof("\"\0foo\"")},
-    {"\"foo\0\"", sizeof("\"foo\0\"")},
-    {"\"\0fo\12o\"", sizeof("\"\0fo\12o\"")}
+    {"\"fo\0o\"", sizeof("\"fo\0o\"") -1},
+    {"\"\0foo\"", sizeof("\"\0foo\"") -1},
+    {"\"foo\0\"", sizeof("\"foo\0\"") -1},
+    {"\"\0fo\12o\"", sizeof("\"\0fo\12o\"") -1}
 };
 
 /* shouldn't be parsed as valid json */
@@ -202,6 +202,11 @@ char * bogus_json[] = {
     "{[]: 1}",
     "{\"test\"}",
     "{\"test\":}",
+    "{\"test\":1}}",
+    "[[[0]]]]",
+    "[[[0]}]",
+    "[0,[]",
+    "[0,[],",
 };
 
 #ifdef WANT_JSON1
@@ -219,7 +224,7 @@ int main(void) {
 
     for (i = 0; i < sizeof(valid_json) / sizeof(valid_json[0]) ; i++) {
         struct state state = {0};
-        rjson((unsigned char*)valid_json[i], cs_strlen(valid_json[i]), &state);
+        rjson((unsigned char*)valid_json[i], cs_strlen((unsigned char*)valid_json[i]), &state);
         printf("For >>> %s <<<, \n -> %s\n", valid_json[i], json_errors[state.error]);
         puts(print_debug(&state));
         puts(to_string(state.tokens_stack, state.token_cursor));
@@ -232,7 +237,7 @@ int main(void) {
     for (i = 0; i < sizeof(bogus_json) / sizeof(bogus_json[0]) ; i++) {
 
         struct state state = {0};
-        rjson((unsigned char*)bogus_json[i], cs_strlen(bogus_json[i]), &state);
+        rjson((unsigned char*)bogus_json[i], cs_strlen((unsigned char*)bogus_json[i]), &state);
         printf("For >>> %s <<<, \n -> %s\n", bogus_json[i], json_errors[state.error]);
         puts(print_debug(&state));
         puts(to_string(state.tokens_stack, state.token_cursor));
@@ -250,7 +255,7 @@ int main(void) {
         puts(print_debug(&state));
         puts(to_string(state.tokens_stack, state.token_cursor));
         fflush(stdout);
-        assert(state.error != JSON_ERROR_NO_ERRORS);
+        assert(state.error == JSON_ERROR_NO_ERRORS);
     }
 
 #ifdef WANT_JSON1
@@ -271,36 +276,21 @@ int main(void) {
     /* "[1, 2, \"foo\", [1, 2], 4  ]  ", */
     puts("\n\n\n*** EX NIHILO ***");
     struct state state = {0};
-    PUSH_TOKEN(ROOT, NULL, &state);
-    PUSH_TOKEN(ARRAY, NULL, &state);
+    START_AND_PUSH_TOKEN(&state, ROOT, "#custom root");
+    START_AND_PUSH_TOKEN(&state, ARRAY, "[");
     PUSH_ROOT(&state);
-    START_STRING(&state);
-    PUSH_STRING(&state, "1", 1);
-    PUSH_STRING_TOKEN(NUMBER, &state);
-    START_STRING(&state);
-    PUSH_STRING(&state, "2", 1);
-    PUSH_STRING_TOKEN(NUMBER, &state);
-    START_STRING(&state);
-    PUSH_STRING(&state, "\"foo\"", 5);
-    PUSH_STRING_TOKEN(STRING, &state);
-    PUSH_TOKEN(ARRAY, NULL, &state);
+    START_AND_PUSH_TOKEN(&state, NUMBER, "1");
+    START_AND_PUSH_TOKEN(&state, NUMBER, "2");
+    START_AND_PUSH_TOKEN(&state, STRING, "\"foo\"");
+    START_AND_PUSH_TOKEN(&state, ARRAY, "[");
     PUSH_ROOT(&state);
-    START_STRING(&state);
-    PUSH_STRING(&state, "1", 1);
-    PUSH_STRING_TOKEN(NUMBER, &state);
-    START_STRING(&state);
-    PUSH_STRING(&state, "2", 1);
-    PUSH_STRING_TOKEN(NUMBER, &state);
+    START_AND_PUSH_TOKEN(&state, NUMBER, "1");
+    START_AND_PUSH_TOKEN(&state, NUMBER, "2");
     CLOSE_ROOT(&state);
-    START_STRING(&state);
-    PUSH_STRING(&state, "4", 1);
-    PUSH_STRING_TOKEN(NUMBER, &state);
+    START_AND_PUSH_TOKEN(&state, NUMBER, "4");
     puts(to_string(state.tokens_stack, state.token_cursor));
-
-    puts("\n\n\n*** EZ JSON ***");
-    assert(strcmp(serialize(tokenize("42")), "42") == 0);
-    puts("OK");
-    puts(serialize(tokenize("[1, 2, {\"4\": 5, \"4\": 6, \"4\": 5 }]")));
+    puts(to_string_compact(state.tokens_stack, state.token_cursor));
+    assert(strcmp(to_string_compact(state.tokens_stack, state.token_cursor),"[1,2,\"foo\",[1,2],4]") == 0);
 
     return 0;
 }

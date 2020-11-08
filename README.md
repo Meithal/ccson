@@ -66,8 +66,7 @@ before trying again.
 ## Reentrant
 You can produce a json document over the course of several days
 and be able to probe it and store it as it is being produced, without errors.
-
-This makes it easy to work with a sliding window in a limited memory
+That makes it easy to work with a sliding window in a limited memory
 environment.
 
 Every stored token is guaranteed to be complete and can be concatenated 

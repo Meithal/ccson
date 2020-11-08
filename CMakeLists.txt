@@ -31,8 +31,8 @@ message(STATUS "${CMAKE_PROJECT_NAME} version ${CMAKE_PROJECT_VERSION}")
 
 option(RUN_TESTS "Build an executable that checks the library works on your machine (recommanded)" ON)
 if(RUN_TESTS)
-    add_executable(main tests.c)
-    target_link_libraries(main njson)
+    add_executable(tests tests.c)
+    target_link_libraries(tests njson)
 endif()
 
 option(WANT_SINGLE_HEADER_LIB "Generate a single header file by concatenating 2 files." ON)

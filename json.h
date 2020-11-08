@@ -26,9 +26,9 @@
 
 #ifndef WANT_LIBC
 /* from muslC */
-EXPORT size_t cisson_strlen(const char *s)
+EXPORT size_t cisson_strlen(const unsigned char *s)
 {
-    const char *a = s;
+    const unsigned char *a = s;
     for (; *s; s++);
     return s-a;
 }
@@ -78,7 +78,7 @@ struct token {
         OBJECT,
     } kind;
     int root_index;
-    void * address;
+    unsigned char * address;
 };
 #ifndef SELF_MANAGE_MEMORY
 #endif
@@ -104,7 +104,6 @@ struct token {
 #define ERRORS \
   X(JSON_ERROR_NO_ERRORS, "No errors found.") \
   X(JSON_ERROR_INVALID_CHARACTER, "Found an unknown token.") \
-  X(JSON_ERROR_JSON_TOO_SHORT, "End of JSON before we could parse any meaningful token.") \
   X(JSON_ERROR_TWO_OBJECTS_HAVE_SAME_PARENT, "Two values have the same parent.") \
   X(JSON_ERROR_EMPTY, "A JSON document can't be empty.") \
   X(JSON_ERROR_INVALID_ESCAPE_SEQUENCE, "Invalid escape sequence.")                       \
@@ -187,7 +186,7 @@ struct state {
     int root_index;
     unsigned char string_pool[STRING_POOL_SIZE];
     struct token tokens_stack[MAX_TOKENS];
-    unsigned char string_cursor;
+    unsigned int string_cursor;
     int token_cursor;
 #ifdef WANT_JSON1
     enum json_mode mode;
@@ -202,12 +201,12 @@ EXPORT char* print_debug(struct state * );
 #else
 #define print_debug(_) ""
 #endif
-EXPORT char *to_string_(struct token *tokens_, int max, int compact);
-#define to_string(tokens_, max) to_string_(tokens_, max, 0)
-#define to_string_compact(tokens_, max) to_string_(tokens_, max, 1)
+EXPORT unsigned char *to_string_(struct token tokens_[MAX_TOKENS], int max, int compact);
+#define to_string(tokens_, max) (char *)to_string_(tokens_, max, 0)
+#define to_string_compact(tokens_, max) (char *)to_string_(tokens_, max, 1)
 /* Building */
-EXPORT void start_string(unsigned char *, const unsigned char [STRING_POOL_SIZE]);
-EXPORT void push_string(const unsigned char *, unsigned char [STRING_POOL_SIZE], char* string, int length);
+EXPORT void start_string(unsigned int *, const unsigned char [STRING_POOL_SIZE]);
+EXPORT void push_string(const unsigned int *cursor, unsigned char *pool, char* string, int length);
 EXPORT void close_root(struct token *, int *);
 EXPORT void push_root(int *, const int *);
 EXPORT void push_token(enum kind , void * , struct token (*), int * , int);
@@ -218,14 +217,7 @@ EXPORT void push_token(enum kind , void * , struct token (*), int * , int);
 #define PUSH_ROOT(state_) push_root(&(state_)->root_index, &(state_)->token_cursor)
 #define PUSH_TOKEN(kind_, address_, state_) push_token((kind_), (address_), (state_)->tokens_stack, &(state_)->token_cursor, (state_)->root_index)
 #define PUSH_STRING_TOKEN(kind_, state_) PUSH_TOKEN((kind_), (state_)->string_pool + (state_)->string_cursor, (state_))
-struct state ez_state__ = {.tokens_stack[0].kind=UNSET};
-#define tokenize(string_) (\
-  (void)rjson((unsigned char*)(string_), \
-  (size_t)cs_strlen(string_), \
-  ((void)cs_memset(&ez_state__, 0, sizeof ez_state__), &ez_state__)) \
-  , (ez_state__).tokens_stack \
-)
-#define serialize(paste_) to_string(paste_, (ez_state__).token_cursor)
+#define START_AND_PUSH_TOKEN(state, kind, string) START_STRING(state); PUSH_STRING(state, string, (sizeof string) - 1); PUSH_STRING_TOKEN(kind, state)
 /* __/ */
 
 #endif //JSON_JSON_H

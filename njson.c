@@ -20,11 +20,11 @@ static inline size_t remaining(size_t max, size_t where) {
     return max - where;
 }
 
-EXPORT void start_string(unsigned char * cursor, const unsigned char pool[STRING_POOL_SIZE]) {
+EXPORT void start_string(unsigned int * cursor, const unsigned char pool[STRING_POOL_SIZE]) {
     *cursor += pool[*cursor] + 1;
 }
 
-EXPORT void push_string(const unsigned char * cursor, unsigned char pool[STRING_POOL_SIZE], char* string, int length) {
+EXPORT void push_string(const unsigned int *cursor, unsigned char *pool, char* string, int length) {
     cs_memcpy(pool + *cursor + 1 + pool[*cursor], string, length);
     pool[*cursor] += length;
 }
@@ -46,14 +46,13 @@ EXPORT int rjson(unsigned char* string, size_t len, struct state* state) {
 #define peek_at(where) string[state->ordinal + where]
 #define SET_STATE_AND_ADVANCE_BY(which_, advance_) state->kind = which_; state->ordinal += advance_
     struct token (*tokens)[MAX_TOKENS] = &state->tokens_stack;
-    PUSH_TOKEN(ROOT, NULL, state);
+    START_AND_PUSH_TOKEN(state, ROOT, "#root");
 
     // fixme: complete example with self managed memory.
     // todo: fully test reentrance
     // todo: make ANSI/STDC compatible
     // todo: complete unicode support?
     // todo: add jasmine mode? aka not copy strings+numbers ?
-    // fixme: Transform control characters and escape sequence only when displaying, helps compat with jasmine
 
     if (state->ordinal == 0) {
         state->error = JSON_ERROR_NO_ERRORS;
@@ -80,12 +79,12 @@ EXPORT int rjson(unsigned char* string, size_t len, struct state* state) {
                     SET_STATE_AND_ADVANCE_BY(FOUND_OPEN_QUOTE, 1);
                 }
                 else if (peek_at(0) == '[') {
-                    PUSH_TOKEN(ARRAY, NULL, state);
+                    START_AND_PUSH_TOKEN(state, ARRAY, "[");
                     PUSH_ROOT(state);
                     SET_STATE_AND_ADVANCE_BY(OPEN_ARRAY, 1);
                 }
                 else if (peek_at(0) == '{') {
-                    PUSH_TOKEN(OBJECT, NULL, state);
+                    START_AND_PUSH_TOKEN(state, OBJECT, "{");
                     PUSH_ROOT(state);
                     SET_STATE_AND_ADVANCE_BY(OPEN_ASSOC, 1);
                 }
@@ -99,23 +98,23 @@ EXPORT int rjson(unsigned char* string, size_t len, struct state* state) {
                         && peek_at(2) == 'u'
                         && peek_at(3) == 'e' )
                 {
-                    PUSH_TOKEN(TRUE, NULL, state);
-                    SET_STATE_AND_ADVANCE_BY(WHITESPACE_AFTER_VALUE, cs_strlen("true"));
+                    START_AND_PUSH_TOKEN(state, TRUE, "true");
+                    SET_STATE_AND_ADVANCE_BY(WHITESPACE_AFTER_VALUE, sizeof("true") - 1);
                 }
                 else if (peek_at(0) == 'f'
                          && peek_at(1) == 'a'
                          && peek_at(2) == 'l'
                          && peek_at(3) == 's'
                          && peek_at(4) == 'e') {
-                    PUSH_TOKEN(FALSE, NULL, state);
-                    SET_STATE_AND_ADVANCE_BY(WHITESPACE_AFTER_VALUE, cs_strlen("false"));
+                    START_AND_PUSH_TOKEN(state, FALSE, "false");
+                    SET_STATE_AND_ADVANCE_BY(WHITESPACE_AFTER_VALUE, sizeof("false") - 1);
                 }
                 else if (peek_at(0) == 'n'
                          && peek_at(1) == 'u'
                          && peek_at(2) == 'l'
                          && peek_at(3) == 'l') {
-                    PUSH_TOKEN(JSON_NULL, NULL, state);
-                    SET_STATE_AND_ADVANCE_BY(WHITESPACE_AFTER_VALUE, cs_strlen("null"));
+                    START_AND_PUSH_TOKEN(state, JSON_NULL, "null");
+                    SET_STATE_AND_ADVANCE_BY(WHITESPACE_AFTER_VALUE, sizeof("null") - 1);
                 }
                 else if (tokens[state->root_index]->kind != ROOT) {
                     state->error = JSON_ERROR_ASSOC_EXPECT_VALUE;
@@ -217,15 +216,10 @@ EXPORT int rjson(unsigned char* string, size_t len, struct state* state) {
                     state->error = JSON_ERROR_INVALID_ESCAPE_SEQUENCE;
                 }
 
-
                 break;
             }
             case IN_STRING: {
-                if (!remaining(len, state->ordinal))
-                {
-                    state->error = JSON_ERROR_JSON_TOO_SHORT;
-                }
-                else if (peek_at(0) == '\\')
+                if (peek_at(0) == '\\')
                 {
                     SET_STATE_AND_ADVANCE_BY(LITERAL_ESCAPE, 1);
                 }
@@ -234,54 +228,9 @@ EXPORT int rjson(unsigned char* string, size_t len, struct state* state) {
                     PUSH_STRING(state, "\"", 1);
                     SET_STATE_AND_ADVANCE_BY(CLOSE_STRING, 1);
                 }
-                else if (peek_at(0) == '\b') {
-                    PUSH_STRING(state, "\\b", 2);
-                    SET_STATE_AND_ADVANCE_BY(IN_STRING, 1);
-                }
-                else if (peek_at(0) == '\f') {
-                    PUSH_STRING(state, "\\f", 2);
-                    SET_STATE_AND_ADVANCE_BY(IN_STRING, 1);
-                }
-                else if (peek_at(0) == '\n') {
-                    PUSH_STRING(state, "\\n", 2);
-                    SET_STATE_AND_ADVANCE_BY(IN_STRING, 1);
-                }
-                else if (peek_at(0) == '\r') {
-                    PUSH_STRING(state, "\\r", 2);
-                    SET_STATE_AND_ADVANCE_BY(IN_STRING, 1);
-                }
-                else if (peek_at(0) == '\t') {
-                    PUSH_STRING(state, "\\t", 2);
-                    SET_STATE_AND_ADVANCE_BY(IN_STRING, 1);
-                }
-                else if(peek_at(0) < ' ')
-                {
-                    PUSH_STRING(state, "\\u00", 4);
-                    PUSH_STRING(state, ((char[2]){hexdigits[peek_at(0)/16], hexdigits[peek_at(0)%16]}), 2);
-                    SET_STATE_AND_ADVANCE_BY(IN_STRING, 1);
-                }
-//                else if(peek_at(0) > 0xffff) { /* In UTF16 realm */
-//                    push_string(state, "\\u00", 4);
-//                    push_string(state, (char[]){num_to_hex[peek_at(0)/16], num_to_hex[peek_at(0)%16]}, 2);
-//                    set_state_and_advance_by(IN_STRING, 1);
-//                }
-                else if(peek_at(0) > 0xFF / 2) { /* In extended ASCII */
-                    if((peek_at(0) & 0xe0u) == 0xe0) { /* 3 highest bits are set */
-                        state->error = JSON_ERROR_UTF16_NOT_SUPPORTED_YET;
-                        break;
-                    }
-                    PUSH_STRING(state, "\\u00", 4);
-                    unsigned char decoded = (string[state->ordinal]&0x1Fu<<5u)|(string[state->ordinal+1]&0x7Fu);
-                    PUSH_STRING(state, ((char[2]){hexdigits[decoded/16], hexdigits[decoded%16]}), 2);
-                    SET_STATE_AND_ADVANCE_BY(IN_STRING, 2);
-                }
                 else {
                     PUSH_STRING(state, (char[]){peek_at(0)}, 1);
                     SET_STATE_AND_ADVANCE_BY(IN_STRING, 1);
-                }
-
-                if(state->ordinal >= 2 && ((peek_at(-2) & 0xe0u) == 0xe0)) {
-                    state->error = JSON_ERROR_UTF16_NOT_SUPPORTED_YET;
                 }
 
                 break;
@@ -483,7 +432,7 @@ EXPORT char* print_debug(struct state * state) {
     for (j = 0; j < state->token_cursor; ++j) {
         cursor += snprintf(output, 80, "%d: kind: %s, root: %d", j, (char*[]){
                 "UNSET", "ROOT", "TRUE", "FALSE", "JSON_NULL",
-                "STRING", "NUMBER", "ARRAY", "OBJECT", "OBJECT_KEY"
+                "STRING", "NUMBER", "ARRAY", "OBJECT"
         }[tokens[j].kind],
                 tokens[j].root_index);
         if(tokens[j].kind == STRING || tokens[j].kind == NUMBER) {
@@ -499,44 +448,103 @@ EXPORT char* print_debug(struct state * state) {
 }
 #endif
 
-static char ident_s[0x80];
-static char * print_ident(int ident, int compact) {
-    if(compact) return "";
-    cs_memset(ident_s, ' ', ident * 2);
-    ident_s[ident * 2] = '\0';
+static unsigned char ident_s[0x80];
+static unsigned char * print_ident(int ident, unsigned compact) {
+    cs_memset(ident_s, ' ', ident * 2 * (compact ^ 1u));
+    ident_s[ident * 2 * (compact ^ 1u)] = '\0';
     return ident_s;
 }
 
+/**
+ * Turns \0 into \u0000, \/ into / , this makes json valid
+ * but also helps to compare two json objects for equality.
+ * */
+EXPORT size_t shortest_safe_string(unsigned char * target, const unsigned char * source, int bytecount) {
+    if(!bytecount) return 0;
+    int i;
+    int inc;
+    unsigned char n;
+    unsigned char * start = target;
+    for(i = 0; i < bytecount ; i+=inc) {
+        n = source[i];
+        inc = 1;
+        if(n == '\\') {
+            if(i == bytecount - 1) return *(target++) = '*', *(target++) = '*', *(target) = '*', -1;  /*
+            * escape sequence at the end of a token */
+            if(source[i + 1] == '/') *(target++) = '/';
+            else if (in("\\\"bfnrtu",source[i + 1])) *(target++) = '\\', *(target++) = source[i + 1];
+            /* fixme: \uXXXX are longer than their utf8 equivalent. */
+            else return *(target++) = '*', *(target++) = '*', *(target) = '*', -2;  /* invalid escape sequence */
+            inc = 2;
+        }
+        else if (n == '\b') *(target++) = '\\', *(target++) = 'b';
+        else if (n == '\f') *(target++) = '\\', *(target++) = 'f';
+        else if (n == '\n') *(target++) = '\\', *(target++) = 'n';
+        else if (n == '\r') *(target++) = '\\', *(target++) = 'r';
+        else if (n == '\t') *(target++) = '\\', *(target++) = 't';
+        else if (n < ' ') {  /* ascii control characters */
+            *(target++) = '\\', *(target++) = 'u', *(target++) = '0', *(target++) = '0';
+            *(target++) = hexdigits[n/16], *(target++) = hexdigits[n%16];
+        }
+        else if(n > 0xFF / 2) {  /* fixme: check for valid unicode, especially for low codepoints and >= 0x10000 */
+            /* todo: extended ascii support can be added here */
+            if(i == bytecount - 1 && (n & 0x80u) != 0x80) return *(target++) = '*', *(target++) = '*', *(target) = '*', -3;
+                    /* beginning of a unicode sequence at the end of the string */
+            *(target++) = n;  /* paste raw utf8 as is, fixme: convert utf16 surrogates into utf8,
+                               * anything \u encoded into utf8
+                               * +decode codepoint and find shortest utf8 encoding.
+                               * unsigned char decoded = (string[state->ordinal]&0x1Fu<<5u)|(string[state->ordinal+1]&0x7Fu);
+                               */
+        } else {
+            *(target++) = n;
+        }
+    }
 
-EXPORT char *to_string_(struct token *tokens_, int max, int compact) {
+    return target - start;
+}
+
+static inline size_t get_length(struct token *token) {
+    return (int[]){
+        [UNSET] = 0, [ROOT] = 0,
+        [TRUE] = sizeof("true") - 1,
+        [FALSE] = sizeof("false") - 1,
+        [JSON_NULL] = sizeof("null") - 1,
+        [STRING] = *((char*)token->address),
+        [NUMBER] = *((char*)token->address),
+        [ARRAY] = 1, [OBJECT] = 1
+    }[token->kind];
+}
+
+EXPORT unsigned char *to_string_(struct token tokens[MAX_TOKENS], int max, int compact) {
     // todo: make the caller handle the buffer
-    // todo: add compact output for tests
-#define cat(where, string) (cs_memcpy((where), (string), cs_strlen((string))), cs_strlen((string)))
 
-    struct token *tokens = tokens_;
+#define cat(where, string, token) (\
+    shortest_safe_string((where), (string), get_length((token))\
+))
+#define cat_raw(where, string) (cs_memcpy((where), (string), cs_strlen((string))), cs_strlen((string)))
 
-    static char output[STRING_POOL_SIZE];
+    typedef unsigned char u8;
+
+    static unsigned char output[STRING_POOL_SIZE];
     cs_memset(output, 0, sizeof output);
     size_t cursor = 0;
     int ident = 0;
     int j;
     for (j = 1; j < max; ++j) {
         if (tokens[tokens[j].root_index].kind == STRING) {
-            cursor += cat(output + cursor, compact ? ":" : ": ");
+            cursor += cat_raw(output + cursor, compact ? ":" : ": ");
         } else {
-            cursor += cat(output + cursor, print_ident(ident, compact));
+            cursor += (cs_memcpy(output + cursor, print_ident(ident, compact), cs_strlen(print_ident(ident, compact))), cs_strlen(print_ident(ident, compact)));
         }
 
-        if (tokens[j].kind == TRUE) cursor += cat(output + cursor, "true");
-        if (tokens[j].kind == FALSE) cursor += cat(output + cursor, "false");
-        if (tokens[j].kind == JSON_NULL) cursor += cat(output + cursor, "null");
-        if (tokens[j].kind == STRING || tokens[j].kind == NUMBER) {
-            char dest[STRING_POOL_SIZE] = {0};
-            cs_memcpy(dest, (char*)tokens[j].address + 1, *((char *) tokens[j].address));
-            cursor += cat(output + cursor, dest);
+        unsigned char dest[STRING_POOL_SIZE] = {0};
+        cs_memcpy(dest, (char*)tokens[j].address + 1, *((char *) tokens[j].address));
+        cursor += cat(output + cursor, dest, &tokens[j]);
+
+        if(tokens[j].kind == ARRAY || tokens[j].kind == OBJECT) {
+            cursor += cat_raw(output + cursor, compact ? "" : "\n");
+            ident++;
         }
-        if (tokens[j].kind == ARRAY) cursor += cat(output + cursor, compact ? "[" : "[\n"), ident++;
-        if (tokens[j].kind == OBJECT) cursor += cat(output + cursor, compact ? "{" : "{\n"), ident++;
         if (j <= max) {
             if (tokens[j + 1].root_index < tokens[j].root_index) {
                 if (j + 1 == max
@@ -547,16 +555,16 @@ EXPORT char *to_string_(struct token *tokens_, int max, int compact) {
                     for (;;) {
 
                         if(tokens[tokens[cur_node].root_index].kind == ARRAY) {
-                            cursor += cat(output + cursor, compact ? "" : "\n");
+                            cursor += cat_raw(output + cursor, compact ? "" : "\n");
                             --ident;
-                            cursor += cat(output + cursor, print_ident(ident, compact));
-                            cursor += cat(output + cursor, "]");
+                            cursor += (cs_memcpy(output + cursor, print_ident(ident, compact), cs_strlen(print_ident(ident, compact))), cs_strlen(print_ident(ident, compact)));
+                            cursor += cat_raw(output + cursor, "]");
                         }
                         else if(tokens[tokens[cur_node].root_index].kind == OBJECT) {
-                            cursor += cat(output + cursor, compact ? "" : "\n");
+                            cursor += cat_raw(output + cursor, compact ? "" : "\n");
                             --ident;
-                            cursor += cat(output + cursor, print_ident(ident, compact));
-                            cursor += cat(output + cursor, "}");
+                            cursor += (cs_memcpy(output + cursor, print_ident(ident, compact), cs_strlen(print_ident(ident, compact))), cs_strlen(print_ident(ident, compact)));
+                            cursor += cat_raw(output + cursor, "}");
                         }
                         if(tokens[(cur_node = tokens[cur_node].root_index)].root_index == target) {
                             break;
@@ -567,11 +575,12 @@ EXPORT char *to_string_(struct token *tokens_, int max, int compact) {
             if (j + 1 < max && (
                 tokens[tokens[j].root_index].kind == STRING || tokens[tokens[j].root_index].kind == ARRAY
             ) && tokens[j].kind != ARRAY && tokens[j].kind != OBJECT) {
-                cursor += cat(output + cursor, compact ? "," : ",\n");
+                cursor += cat_raw(output + cursor, compact ? "," : ",\n");
             }
         }
     }
-    output[cursor] = '\0';
+
     return output;
 #undef cat
+#undef cat_raw
 }
