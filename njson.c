@@ -81,6 +81,7 @@ rjson(size_t len, struct state * state) {
     // todo: add jasmine mode? aka not copy strings+numbers ?
     // todo: pedantic mode?
     // fixme: the cursor shouldn't advance on error
+    // fixme: tokenizer macro functions should be functions
 
     if (state->cursor == 0) {
         state->error = JSON_ERROR_NO_ERRORS;
@@ -144,7 +145,7 @@ rjson(size_t len, struct state * state) {
                             len_whitespace(state->cursor)+sizeof("null") - 1
                             );
                 }
-                else if (tokens[state->root_index]->kind != ROOT) {
+                else if (state->tokens.tokens_stack[state->root_index].kind != ROOT) {
                     state->error = JSON_ERROR_ASSOC_EXPECT_VALUE;
                 }
                 else if (remaining(final, state->cursor)) {
@@ -267,17 +268,9 @@ rjson(size_t len, struct state * state) {
 
                 break;
             }
+
             case NUMBER_AFTER_MINUS:
             {
-//                PUSH_STRING(
-//                        state,
-//                        ((char[]){peek_at(0)}),
-//                        ((int[]){0, 1}[in("-", peek_at(0))])
-//
-//                        ((int[]){(state->error = JSON_ERROR_INVALID_NUMBER, state->cur_state), EXPECT_FRACTION, IN_NUMBER}[in(digits, peek_at(0))]),
-//                        ((char[]){peek_at(0)}),
-//                        state->error == JSON_ERROR_NO_ERRORS);
-                //state->error = /
                 if (peek_at(0) == '0') {
                     PUSH_STRING(state, (char[]){peek_at(0)}, 1);
                     SET_STATE_AND_ADVANCE_BY(EXPECT_FRACTION, 1);
@@ -310,6 +303,7 @@ rjson(size_t len, struct state * state) {
 
                 break;
             }
+
             case EXPECT_EXPONENT: {
                 if (peek_at(0) == 'e' || peek_at(0) == 'E') {
                     PUSH_STRING(state, (char[]){peek_at(0)}, 1);
@@ -321,6 +315,7 @@ rjson(size_t len, struct state * state) {
 
                 break;
             }
+
             case IN_FRACTION: {
                 if (in(digits, peek_at(0))) {
                     PUSH_STRING(state, (char[]){peek_at(0)}, 1);
@@ -331,6 +326,7 @@ rjson(size_t len, struct state * state) {
 
                 break;
             }
+
             case IN_FRACTION_DIGIT: {
                 if (in(digits, peek_at(0))) {
                     PUSH_STRING(state, (char[]){peek_at(0)}, 1);
@@ -341,6 +337,7 @@ rjson(size_t len, struct state * state) {
 
                 break;
             }
+
             case EXPONENT_EXPECT_PLUS_MINUS: {
                 if (peek_at(0) == '+' || peek_at(0) == '-') {
                     PUSH_STRING(state, (char[]){peek_at(0)}, 1);
@@ -351,6 +348,7 @@ rjson(size_t len, struct state * state) {
 
                 break;
             }
+
             case EXPECT_EXPONENT_DIGIT: {
                 if (in(digits, peek_at(0))) {
                     PUSH_STRING(state, (char[]){peek_at(0)}, 1);
@@ -361,6 +359,7 @@ rjson(size_t len, struct state * state) {
 
                 break;
             }
+
             case IN_EXPONENT_DIGIT: {
                 if (in(digits, peek_at(0))) {
                     PUSH_STRING(state, (char[]) {peek_at(0)}, 1);
@@ -372,6 +371,7 @@ rjson(size_t len, struct state * state) {
 
                 break;
             }
+
             case ARRAY_AFTER_VALUE: {
                 if(peek_at(len_whitespace(state->cursor)) == ',') {
                     SET_STATE_AND_ADVANCE_BY(EXPECT_VALUE, len_whitespace(state->cursor) + 1);
@@ -384,12 +384,14 @@ rjson(size_t len, struct state * state) {
 
                 break;
             }
+
             case ASSOC_AFTER_VALUE: {
                 CLOSE_ROOT(state);
                 SET_STATE_AND_ADVANCE_BY(AFTER_VALUE, len_whitespace(state->cursor));
 
                 break;
             }
+
             case ASSOC_EXPECT_KEY: {
                 if(peek_at(len_whitespace(state->cursor) + 0) == '"') {
                     START_STRING(state);
@@ -400,7 +402,8 @@ rjson(size_t len, struct state * state) {
                 }
                 break;
             }
-            case CLOSE_STRING: {
+
+            case CLOSE_STRING: {  /* fixme: non advancing state */
                 PUSH_STRING_TOKEN(STRING, state);
                 if ((*tokens)[state->root_index].kind == OBJECT) {
                     PUSH_ROOT(state);
@@ -411,6 +414,7 @@ rjson(size_t len, struct state * state) {
 
                 break;
             }
+
             case ASSOC_EXPECT_COLON: {
                 if(peek_at(len_whitespace(state->cursor)) == ':') {
                     SET_STATE_AND_ADVANCE_BY(EXPECT_VALUE, len_whitespace(state->cursor) + 1);
@@ -419,6 +423,7 @@ rjson(size_t len, struct state * state) {
                 }
                 break;
             }
+
             case ASSOC_AFTER_INNER_VALUE: {
                 if(peek_at(len_whitespace(state->cursor)) == ',') {
                     CLOSE_ROOT(state);
@@ -429,6 +434,7 @@ rjson(size_t len, struct state * state) {
                 } else {
                     state->error = JSON_ERROR_ASSOC_EXPECT_VALUE;
                 }
+
                 break;
             }
         }
@@ -481,10 +487,6 @@ static char * print_ident(int ident, unsigned compact) {
     return ident_s;
 }
 
-/**
- * Turns \0 into \u0000, \/ into / , this makes json valid
- * but also helps to compare two json objects for equality.
- * */
 EXPORT size_t shortest_safe_string(unsigned char * target, const unsigned char * source, int bytecount) {
     if(!bytecount) return 0;
     int i;
