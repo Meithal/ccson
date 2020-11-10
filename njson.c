@@ -1,15 +1,16 @@
 #include "json.h"
 
-static inline int in(char* hay, unsigned char needle) {
+static inline size_t in(char* res hay, unsigned char needle) {
     if (needle == '\0') return 0;
+    char * begin = hay;
     for (;*hay; hay++) {
-        if(*hay == needle) return 1;
+        if(*hay == needle) return (hay - begin) + 1;
     }
     return 0;
 }
 
 static inline size_t
-len_whitespace(unsigned char* string) {
+len_whitespace(unsigned char * res string) {
     int count = 0;
     while(in(whitespaces, string[count])) {
         count++;
@@ -18,12 +19,12 @@ len_whitespace(unsigned char* string) {
 }
 
 static inline size_t
-remaining(unsigned char *max, unsigned char *where) {
+remaining(unsigned char * res max, unsigned char * res where) {
     return max - where;
 }
 
 EXPORT void
-start_string(unsigned int * cursor,
+start_string(unsigned int * res cursor,
              const unsigned char pool[STRING_POOL_SIZE]) {
     *cursor += pool[*cursor] + 1;
 }
@@ -74,11 +75,12 @@ rjson(size_t len, struct state * state) {
     START_AND_PUSH_TOKEN(state, ROOT, "#root");
 
     // fixme: complete example with self managed memory.
-    // todo: fully test reentrance
+    // todo: fully test reentry
     // todo: make ANSI/STDC compatible
     // todo: complete unicode support?
     // todo: add jasmine mode? aka not copy strings+numbers ?
     // todo: pedantic mode?
+    // fixme: the cursor shouldn't advance on error
 
     if (state->cursor == 0) {
         state->error = JSON_ERROR_NO_ERRORS;
@@ -212,15 +214,7 @@ rjson(size_t len, struct state * state) {
                 break;
             }
             case LITERAL_ESCAPE: {
-                if (peek_at(0) == '\\') {
-                    PUSH_STRING(state, (char[]) {peek_at(0)}, 1);
-                    SET_STATE_AND_ADVANCE_BY(IN_STRING, 1);
-                }
-                else if (peek_at(0) == '"') {
-                    PUSH_STRING(state, (char[]) {peek_at(0)}, 1);
-                    SET_STATE_AND_ADVANCE_BY(IN_STRING, 1);
-                }
-                else if (peek_at(0) == '/') {
+                if (in("\\\"/", peek_at(0))) {
                     PUSH_STRING(state, (char[]) {peek_at(0)}, 1);
                     SET_STATE_AND_ADVANCE_BY(IN_STRING, 1);
                 }
@@ -233,8 +227,7 @@ rjson(size_t len, struct state * state) {
                         state->error = JSON_ERROR_INCOMPLETE_UNICODE_ESCAPE;
                         break;
                     }
-                    PUSH_STRING(state, (char[]) {peek_at(0)}, 1);
-                    PUSH_STRING(state, (char*)state->cursor, 4);
+                    PUSH_STRING(state, (char*)state->cursor, 5);
                     SET_STATE_AND_ADVANCE_BY(IN_STRING, 5);
                     break;
                 }
@@ -245,35 +238,46 @@ rjson(size_t len, struct state * state) {
                 break;
             }
             case IN_STRING: {
-                if (peek_at(0) == '\\')
-                {
-                    PUSH_STRING(state, (char[]) {peek_at(0)}, 1);
-                    SET_STATE_AND_ADVANCE_BY(LITERAL_ESCAPE, 1);
-                }
-                else if (peek_at(0) == '"')
-                {
-                    PUSH_STRING(state, (char[]) {peek_at(0)}, 1);
-                    SET_STATE_AND_ADVANCE_BY(CLOSE_STRING, 1);
-                }
-                else {
-                    PUSH_STRING(state, (char[]){peek_at(0)}, 1);
-                    SET_STATE_AND_ADVANCE_BY(IN_STRING, 1);
-                }
+                state->error = JSON_ERROR_UNESCAPED_CONTROL * (peek_at(0) < 0x20 && !in("\b\f\n\r\t", peek_at(0)));
+                PUSH_STRING(state, (char[]) {peek_at(0)}, state->error == JSON_ERROR_NO_ERRORS);
+                SET_STATE_AND_ADVANCE_BY(
+                        (
+                                (int[]){
+                                        IN_STRING,
+                                        LITERAL_ESCAPE,
+                                        CLOSE_STRING
+                                }[in("\\\"", peek_at(0))]),
+                        /*state->error == JSON_ERROR_NO_ERRORS);*/
+                        1);
 
                 break;
             }
+
             case START_NUMBER: {
-                if (peek_at(0) == '-') {
-                    PUSH_STRING(state, (char[]){peek_at(0)}, 1);
-                    SET_STATE_AND_ADVANCE_BY(NUMBER_AFTER_MINUS, 1);
-                } else {
-                    SET_STATE_AND_ADVANCE_BY(NUMBER_AFTER_MINUS, 0);
-                }
+                PUSH_STRING(
+                        state,
+                ((char[]){peek_at(0)}),
+                ((int[]){0, 1}[in("-", peek_at(0))])
+                    );
+                SET_STATE_AND_ADVANCE_BY(
+                    NUMBER_AFTER_MINUS,
+                    (
+                            (int[]){0, 1}[in("-", peek_at(0))])
+                    );
 
                 break;
             }
             case NUMBER_AFTER_MINUS:
             {
+//                PUSH_STRING(
+//                        state,
+//                        ((char[]){peek_at(0)}),
+//                        ((int[]){0, 1}[in("-", peek_at(0))])
+//
+//                        ((int[]){(state->error = JSON_ERROR_INVALID_NUMBER, state->cur_state), EXPECT_FRACTION, IN_NUMBER}[in(digits, peek_at(0))]),
+//                        ((char[]){peek_at(0)}),
+//                        state->error == JSON_ERROR_NO_ERRORS);
+                //state->error = /
                 if (peek_at(0) == '0') {
                     PUSH_STRING(state, (char[]){peek_at(0)}, 1);
                     SET_STATE_AND_ADVANCE_BY(EXPECT_FRACTION, 1);
@@ -434,7 +438,7 @@ rjson(size_t len, struct state * state) {
         }
     }
 
-    exit: return state->tokens.token_cursor;
+    exit: return state->error;
 #undef peek_at
 #undef SET_STATE_AND_ADVANCE_BY
 }
@@ -509,14 +513,17 @@ EXPORT size_t shortest_safe_string(unsigned char * target, const unsigned char *
             *(target++) = hexdigits[n/16], *(target++) = hexdigits[n%16];
         }
         else if(n > 0xFF / 2) {  /* fixme: check for valid unicode, especially for low codepoints and >= 0x10000 */
-            /* todo: extended ascii support can be added here */
-            if(i == bytecount - 1 && (n & 0x80u) != 0x80) return *(target++) = '*', *(target++) = '*', *(target) = '*', -3;
-                    /* beginning of a unicode sequence at the end of the string */
-            *(target++) = n;  /* paste raw utf8 as is, fixme: convert utf16 surrogates into utf8,
-                               * anything \u encoded into utf8
-                               * +decode codepoint and find shortest utf8 encoding.
-                               * unsigned char decoded = (string[state->ordinal]&0x1Fu<<5u)|(string[state->ordinal+1]&0x7Fu);
-                               */
+            if( i == (bytecount - 1) && (n & 0x80u) != 0x80 /* beginning of a unicode sequence at the end of the string */
+            || (i > 0 && i < (bytecount - 1) && (n & 0x80u) == 0x80 && (source[i + 1] & 0x80u) != 0x80 && (source[i - 1] & 0x80u) != 0x80)/* isolated high order bytes */
+            )
+                *(target++) = '\xff', *(target++) = '\xfd';
+            else
+                *(target++) = n;  /* paste raw utf8 as is,
+                   * fixme: convert utf16 surrogates into utf8,
+                   * anything \u encoded into utf8
+                   * +decode codepoint and find shortest utf8 encoding.
+                   * unsigned char decoded = (string[state->ordinal]&0x1Fu<<5u)|(string[state->ordinal+1]&0x7Fu);
+                   */
         } else {
             *(target++) = n;
         }

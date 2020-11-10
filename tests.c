@@ -7,58 +7,58 @@ struct {
     char * str;
     char * ref;
 } valid_json[] = {
-    "true", "true",
-    "true  ", "true",
-    "  \t  true  ", "true",
-    "  \t  true", "true",
-    "10", "10",
-    "-0", "-0",
-    "1", "1",
-    "123", "123",
-    "1203.4", "1203.4",
-    "123.0", "123.0",
-    "123.05", "123.05",
-    "0.12", "0.12",
-    "-0.12", "-0.12",
-    "-0.12e1", "-0.12e1",
-    "-0e3", "-0e3",
-    "-0e-3", "-0e-3",
-    "123.0e12", "123.0e12",
-    "12e0", "12e0",
-    "12e000000012", "12e000000012",
-    "12e000000000", "12e000000000",
-    "12e+0", "12e+0",
-    "12e-0", "12e-0",
-    "12e1", "12e1",
-    "-12e1", "-12e1",
-    "12e01", "12e01",
-    "12e+01", "12e+01",
-    "-12e+01", "-12e+01",
-    "12e-01", "12e-01",
-    "-12e-01", "-12e-01",
-    "-12.34e+25", "-12.34e+25",
-    "-12.34E+25", "-12.34E+25",
-    "-12.34E-25", "-12.34E-25",
-    "-12.34e25", "-12.34e25",
-    "\"foo\"", "\"foo\"",
-    "false", "false",
-    "null", "null",
-    " \" a random string\"", "\" a random string\"",
-    "[1, 2, \"foo\", [1, 2], 4  ]  ", "[1,2,\"foo\",[1,2],4]",
-    "[1, 2, 3]", "[1,2,3]",
-    "[1, \"2\", 3, \"\", \"\", \"foo\"]", "[1,\"2\",3,\"\",\"\",\"foo\"]",
-    "[1 , 2 , 3 ]", "[1,2,3]",
-    "[1, 2, 3  ]", "[1,2,3]",
-    "[1, 2, 3  ]  ", "[1,2,3]",
-    " \" à random string é with lower block characters.\"", "\" à random string é with lower block characters.\"",
-    " \" \u1011 random string with \u1011 correctly encoded null byte\"", "___",
-    " \" a random string with \\u0000 correctly encoded null byte.\"", "\" a random string with \\u0000 correctly encoded null byte.\"",
-    "{\r\n\t "
+    "true", "true",                           /* 0 */
+    "true  ", "true",                         /* 1 */
+    "  \t  true  ", "true",                   /* 2 */
+    "  \t  true", "true",                     /* 3 */
+    "10", "10",                               /* 4 */
+    "-0", "-0",                               /* 5 */
+    "1", "1",                                 /* 6 */
+    "123", "123",                             /* 7 */
+    "1203.4", "1203.4",                       /* 8 */
+    "123.0", "123.0",                         /* 9 */
+    "123.05", "123.05",                       /* 10 */
+    "0.12", "0.12",                           /* 11 */
+    "-0.12", "-0.12",                         /* 12 */
+    "-0.12e1", "-0.12e1",                     /* 13 */
+    "-0e3", "-0e3",                           /* 14 */
+    "-0e-3", "-0e-3",                         /* 15 */
+    "123.0e12", "123.0e12",                   /* 16 */
+    "12e0", "12e0",                           /* 17 */
+    "12e000000012", "12e000000012",           /* 18 */
+    "12e000000000", "12e000000000",           /* 19 */
+    "12e+0", "12e+0",                         /* 20 */
+    "12e-0", "12e-0",                         /* 21 */
+    "12e1", "12e1",                           /* 22 */
+    "-12e1", "-12e1",                         /* 23 */
+    "12e01", "12e01",                         /* 24 */
+    "12e+01", "12e+01",                       /* 25 */
+    "-12e+01", "-12e+01",                     /* 26 */
+    "12e-01", "12e-01",                       /* 27 */
+    "-12e-01", "-12e-01",                     /* 28 */
+    "-12.34e+25", "-12.34e+25",               /* 29 */
+    "-12.34E+25", "-12.34E+25",               /* 30 */
+    "-12.34E-25", "-12.34E-25",               /* 31 */
+    "-12.34e25", "-12.34e25",                 /* 32 */
+    "\"foo\"", "\"foo\"",                     /* 33 */
+    "false", "false",                         /* 34 */
+    "null", "null",                           /* 35 */
+    " \" a random string\"", "\" a random string\"",                           /* 36 */
+    "[1, 2, \"foo\", [1, 2], 4  ]  ", "[1,2,\"foo\",[1,2],4]",                 /* 37 */
+    "[1, 2, 3]", "[1,2,3]",                                                    /* 38 */
+    "[1, \"2\", 3, \"\", \"\", \"foo\"]", "[1,\"2\",3,\"\",\"\",\"foo\"]",     /* 39 */
+    "[1 , 2 , 3 ]", "[1,2,3]",                                                 /* 40 */
+    "[1, 2, 3  ]", "[1,2,3]",                                                  /* 41 */
+    "[1, 2, 3  ]  ", "[1,2,3]",                                                /* 42 */
+    " \" à random string é with lower block characters.\"", "\" à random string é with lower block characters.\"",                          /* 43 */
+    " \" \xCD\xBF random unicode string\"", "___",                                                           /* 44 */
+    " \" a random string with \\u0000 correctly encoded null byte.\"", "\" a random string with \\u0000 correctly encoded null byte.\"",    /* 45 */
+    "{\r\n\t "                                                          /* 46 */
         "\"foo\": \"bar\""
     "}", "{\"foo\":\"bar\"}",
-    "{\"foo\": 1, \"bar\": \"foo\"}", "{\"foo\":1,\"bar\":\"foo\"}",
-    "[1, 2, \"foo\", true]", "[1,2,\"foo\",true]",
-    "{"
+    "{\"foo\": 1, \"bar\": \"foo\"}", "{\"foo\":1,\"bar\":\"foo\"}",    /* 47 */
+    "[1, 2, \"foo\", true]", "[1,2,\"foo\",true]",                      /* 48 */
+    "{"                           /* 0 */
         "    \"Image\": {"
             "\"Width\":  800,"
             "\"Height\": 600,"
@@ -72,7 +72,7 @@ struct {
         "}"
     "}", "___",
 
-    "["
+    "["                           /* 49 */
         "{"
             " \"precision\": \"zip\","
             "\"Latitude\":  37.7668,"
@@ -93,15 +93,16 @@ struct {
             "\"Zip\":       \"94085\","
             "\"Country\":   \"US\""
         "}"
-    "]", "___",
-    "[[[0]]]", "[[[0]]]",
-    "[[[1, 3, [3, 5], 7]], 3]", "[[[1,3,[3,5],7]],3]",
-    "{\"foo\": 1, \"foo\": 1, \"foo\": 2, \"foo\": 1}", "{\"foo\":1,\"foo\":1,\"foo\":2,\"foo\":1}",
-    "\"no\\\\ \\\"white\tspace\"", "\"no\\\\ \\\"white\\tspace\"",
-    "\"tést\"", "\"tést\"",
-    "\"expect shortcuts \\\", \\\\, \\/, \b, \f, \n, \r, \t  \"", "\"expect shortcuts \\\", \\\\, /, \\b, \\f, \\n, \\r, \\t  \"",
-    "\"no shortcuts \a, \v, \' \047 \"", "___",
-    "\"test 漫 \"", "\"test 漫 \"",
+    "]", "___",                           /* 50 */
+    "[[[0]]]", "[[[0]]]",                 /* 51 */
+    "[[[1, 3, [3, 5], 7]], 3]", "[[[1,3,[3,5],7]],3]",                                                 /* 52 */
+    "{\"foo\": 1, \"foo\": 1, \"foo\": 2, \"foo\": 1}", "{\"foo\":1,\"foo\":1,\"foo\":2,\"foo\":1}",   /* 53 */
+    "\"no\\\\ \\\"white\tspace\"", "\"no\\\\ \\\"white\\tspace\"",                                     /* 54 */
+    "\"tést\"", "\"tést\"",                                                                            /* 55 */
+    "\"expect shortcuts \\\", \\\\, \\/, \b, \f, \n, \r, \t  \"", "\"expect shortcuts \\\", \\\\, /, \\b, \\f, \\n, \\r, \\t  \"",   /* 56 */
+    "\"test 漫 \"", "\"test 漫 \"",                                                                         /* 58 */
+    "\"\xFF\"", (char[]){'\"', '\xFF', '\xFD', '\"', '\0'},  /* invalid utf is replaced by \\uFFFD */      /* 59 */
+    "\"\xAF\"", (char[]){'\"', '\xFF', '\xFD', '\"', '\0'},                                                /* 60 */
 };
 
 struct {
@@ -213,6 +214,7 @@ char * bogus_json[] = {
     "[[[0]}]",
     "[0,[]",
     "[0,[],",
+    "\"no shortcuts \a, \v, \' \047 \"", "___",
 };
 
 #ifdef WANT_JSON1
@@ -232,7 +234,7 @@ int main(void) {
         struct state state = {.cursor=(unsigned char*)valid_json[i].str};
         rjson(cs_strlen(valid_json[i].str), &state);
         printf("%d: For >>> %s <<<, \n -> %s\n", i, valid_json[i].str, json_errors[state.error]);
-        puts(print_debug(&state.tokens));
+        printf("%s", print_debug(&state.tokens));
         puts(to_string(&state.tokens));
         fflush(stdout);
         assert(state.error == JSON_ERROR_NO_ERRORS);
@@ -264,7 +266,7 @@ int main(void) {
         puts(print_debug(&state.tokens));
         puts(to_string(&state.tokens));
         fflush(stdout);
-        assert(state.error == JSON_ERROR_NO_ERRORS);
+        assert(state.error == JSON_ERROR_UNESCAPED_CONTROL);
     }
 
 #ifdef WANT_JSON1

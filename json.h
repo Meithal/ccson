@@ -14,6 +14,7 @@
 #endif
 
 #if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
+#define has_c99
 #define res restrict
 #else
 #define res
@@ -123,6 +124,7 @@ struct token {
   X(JSON_ERROR_JSON1_ONLY_ASSOC_ROOT, "JSON1 only allows objects as root element.")  \
   X(JSON_ERROR_UTF16_NOT_SUPPORTED_YET, "Code points greater than 0x0800 not supported yet.") \
   X(JSON_ERROR_INCOMPLETE_UNICODE_ESCAPE, "Incomplete unicode character sequence.") \
+  X(JSON_ERROR_UNESCAPED_CONTROL, "Control characters must be escaped.") \
 
 #define X(a, b) a,
 enum whitespace_tokens { WHITESPACE };
