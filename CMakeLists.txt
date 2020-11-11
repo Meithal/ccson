@@ -10,6 +10,13 @@ execute_process(
         ERROR_QUIET
         OUTPUT_STRIP_TRAILING_WHITESPACE
 )
+execute_process(
+        COMMAND "${GIT_EXECUTABLE}" rev-parse --short HEAD
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+        OUTPUT_VARIABLE _var_LAST_COMMIT_HASH
+        ERROR_QUIET
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+)
 if(_var_res)
     set(_var_LAST_COMMIT, "0")
 else()
@@ -17,6 +24,9 @@ else()
             PROPERTY CMAKE_CONFIGURE_DEPENDS
             "${CMAKE_SOURCE_DIR}/.git/index")
 endif()
+add_compile_definitions(LAST_COMMIT_COUNT="${_var_LAST_COMMIT}")
+add_compile_definitions(LAST_COMMIT_HASH="${_var_LAST_COMMIT_HASH}")
+add_compile_definitions(CMAKE_GENERATOR="$CACHE{CMAKE_C_COMPILER}")
 
 project(Cisson
         VERSION "0.0.1.${_var_LAST_COMMIT}"
@@ -31,7 +41,11 @@ message(STATUS "${CMAKE_PROJECT_NAME} version ${CMAKE_PROJECT_VERSION}")
 
 option(RUN_TESTS "Build an executable that checks the library works on your machine (recommanded)" ON)
 if(RUN_TESTS)
-    add_executable(tests tests.c)
+    option(PROFILE "Profile speed of tests (Windows only)" ON)
+    if(PROFILE)
+        set(PROFILE_FILES tests/tests_profile.c tests/tests_profile.h)
+    endif()
+    add_executable(tests ${PROFILE_FILES} tests/tests.c)
     target_link_libraries(tests njson)
 endif()
 

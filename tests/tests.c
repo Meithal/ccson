@@ -1,4 +1,7 @@
-#include "json.h"
+#include "../json.h"
+#ifndef HAS_VLA
+#include "tests_profile.h"
+#endif // HAS_VLA
 #include <stdio.h>
 #include <assert.h>
 #include <string.h>
@@ -244,13 +247,36 @@ int main(void) {
     int i;
 
     puts("*** ALL SHOULD SUCCEED ***");
+#ifndef HAS_VLA
+    LONGLONG frequency = start_profiler();
+    LONGLONG total_parse_time = 0;
+    LONGLONG total_write_time = 0;
+    printf("Timer frequency: %lld by second.\n", frequency);
+#endif
 
     for (i = 0; i < sizeof(valid_json) / sizeof(valid_json[0]) ; i++) {
         struct state state = {.cursor=(unsigned char*)valid_json[i].str};
+#ifndef HAS_VLA
+        LONGLONG start = start_timer();
+#endif
         rjson(cs_strlen(valid_json[i].str), &state);
-        printf("%d: For >>> %s <<<, \n -> %s\n", i, valid_json[i].str, json_errors[state.error]);
+#ifndef HAS_VLA
+        LONGLONG end = elapsed(start, frequency);
+        total_parse_time += end;
+        printf("%d: For >>> %s <<<, elapsed: %lld\n -> %s\n", i, valid_json[i].str, end, json_errors[state.error]);
+#else
+        printf("%d: For >>> %s <<<\n -> %s\n", i, valid_json[i].str, json_errors[state.error]);
+#endif
         printf("%s", print_debug(&state.tokens));
-        puts(to_string(&state.tokens));
+#ifndef HAS_VLA
+        start = start_timer();
+#endif
+        char* out = to_string(&state.tokens);
+#ifndef HAS_VLA
+        end = elapsed(start, frequency);
+        total_write_time += end;
+#endif
+        puts(out);
         fflush(stdout);
         assert(state.error == JSON_ERROR_NO_ERRORS);
         if(strcmp(valid_json[i].ref, "___") != 0) {
@@ -263,10 +289,27 @@ int main(void) {
     for (i = 0; i < sizeof(bogus_json) / sizeof(bogus_json[0]) ; i++) {
 
         struct state state = {.cursor=(unsigned char*)bogus_json[i]};
+#ifndef HAS_VLA
+        LONGLONG start = start_timer();
+#endif
         rjson(cs_strlen(bogus_json[i]), &state);
-        printf("%d: For >>> %s <<<, \n -> %s\n", i, bogus_json[i], json_errors[state.error]);
+#ifndef HAS_VLA
+        LONGLONG end = elapsed(start, frequency);
+        total_parse_time += end;
+        printf("%d: For >>> %s <<<, elapsed: %lld\n -> %s\n", i, bogus_json[i], end, json_errors[state.error]);
+#else
+        printf("%d: For >>> %s <<<\n -> %s\n", i, bogus_json[i], json_errors[state.error]);
+#endif
         puts(print_debug(&state.tokens));
-        puts(to_string(&state.tokens));
+#ifndef HAS_VLA
+        start = start_timer();
+#endif
+        char* out = to_string(&state.tokens);
+#ifndef HAS_VLA
+        end = elapsed(start, frequency);
+        total_write_time += end;
+#endif
+        puts(out);
         fflush(stdout);
         assert(state.error != JSON_ERROR_NO_ERRORS);
     }
@@ -276,10 +319,27 @@ int main(void) {
     for (i = 0; i < sizeof(bin_safe_json) / sizeof(bin_safe_json[0]) ; i++) {
 
         struct state state = {.cursor=(unsigned char*)bin_safe_json[i].str};
+#ifndef HAS_VLA
+        LONGLONG start = start_timer();
+#endif
         rjson(bin_safe_json[i].size, &state);
-        printf("For >>> %s <<<, \n -> %s\n", bin_safe_json[i].str, json_errors[state.error]);
+#ifndef HAS_VLA
+        LONGLONG end = elapsed(start, frequency);
+        total_parse_time += end;
+        printf("%d: For >>> %s <<<, elapsed: %lld\n -> %s\n", i, bin_safe_json[i].str, end, json_errors[state.error]);
+#else
+        printf("%d: For >>> %s <<<\n -> %s\n", i, bin_safe_json[i].str, json_errors[state.error]);
+#endif
         puts(print_debug(&state.tokens));
-        puts(to_string(&state.tokens));
+#ifndef HAS_VLA
+        start = start_timer();
+#endif
+        char* out = to_string(&state.tokens);
+#ifndef HAS_VLA
+        end = elapsed(start, frequency);
+        total_write_time += end;
+#endif
+        puts(out);
         fflush(stdout);
         assert(state.error == JSON_ERROR_UNESCAPED_CONTROL);
     }
@@ -317,6 +377,21 @@ int main(void) {
     puts(to_string(&state.tokens));
     puts(to_string_compact(&state.tokens));
     assert(strcmp(to_string_compact(&state.tokens),"[1,2,\"foo\",[1,2],4]") == 0);
+
+#ifndef HAS_VLA
+    printf("Total parsing time: %lld\n", total_parse_time);
+    printf("Total Writing time: %lld\n", total_write_time);
+    FILE* file;
+    int error = fopen_s(&file, "profile_data.txt", "a");
+    if(error != 0) {
+        char out[80] = { 0 };
+        _strerror_s(out, 80, "err");
+        puts(out);
+    }
+    fprintf(file, "Total parsing time: %lld ; %s %s - %s\n", total_parse_time, LAST_COMMIT_HASH, LAST_COMMIT_COUNT, CMAKE_GENERATOR);
+    fprintf(file, "Total Writing time: %lld ; %s %s - %s\n", total_write_time, LAST_COMMIT_HASH, LAST_COMMIT_COUNT, CMAKE_GENERATOR);
+    fclose(file);
+#endif
 
     return 0;
 }

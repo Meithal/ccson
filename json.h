@@ -11,6 +11,8 @@
 || defined(__MINGW32__) \
 || defined(__MINGW64__))
 #define HAS_VLA
+#else
+#define _CRT_SECURE_NO_WARNINGS
 #endif
 
 #if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
@@ -132,12 +134,12 @@ enum json_errors{ ERRORS };
 #undef X
 
 #define X(a, b) [a] = b,
-char whitespaces[] = {
+static char whitespaces[] = {
     WHITESPACE
     '\0',
 };
 
-char * json_errors[] = {
+static char * json_errors[] = {
     ERRORS
 };
 #undef X
@@ -145,10 +147,10 @@ char * json_errors[] = {
 #undef WHITESPACE
 #undef ERRORS
 
-char digit_starters[] = "-0123456789";
-char digits[] = "0123456789";
-char digits19[] = "123456789";
-char hexdigits[] = "0123456789abcdefABCDEF";
+static char digit_starters[] = "-0123456789";
+static char digits[] = "0123456789";
+static char digits19[] = "123456789";
+static char hexdigits[] = "0123456789abcdefABCDEF";
 
 enum states {
     EXPECT_VALUE,
@@ -226,5 +228,6 @@ EXPORT void push_token(enum kind , void * res, struct token (* res), int * res, 
 #define PUSH_STRING_TOKEN(kind_, state_) PUSH_TOKEN((kind_), (state_)->string_pool + (state_)->string_cursor, (state_))
 #define START_AND_PUSH_TOKEN(state, kind, string) START_STRING(state); PUSH_STRING(state, string, (sizeof string) - 1); PUSH_STRING_TOKEN(kind, state)
 /* __/ */
+
 
 #endif //JSON_JSON_H

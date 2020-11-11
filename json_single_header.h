@@ -13,13 +13,17 @@
 || defined(__MINGW32__) \
 || defined(__MINGW64__))
 #define HAS_VLA
+#else
+#define _CRT_SECURE_NO_WARNINGS
 #endif
 
-#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
+#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
+#define has_c99
 #define res restrict
 #else
 #define res
 #endif
+
 
 #ifdef HAS_VLA
 #define EXPORT extern
@@ -124,6 +128,7 @@ struct token {
   X(JSON_ERROR_JSON1_ONLY_ASSOC_ROOT, "JSON1 only allows objects as root element.")  \
   X(JSON_ERROR_UTF16_NOT_SUPPORTED_YET, "Code points greater than 0x0800 not supported yet.") \
   X(JSON_ERROR_INCOMPLETE_UNICODE_ESCAPE, "Incomplete unicode character sequence.") \
+  X(JSON_ERROR_UNESCAPED_CONTROL, "Control characters must be escaped.") \
 
 #define X(a, b) a,
 enum whitespace_tokens { WHITESPACE };
@@ -131,12 +136,12 @@ enum json_errors{ ERRORS };
 #undef X
 
 #define X(a, b) [a] = b,
-char whitespaces[] = {
+static char whitespaces[] = {
     WHITESPACE
     '\0',
 };
 
-char * json_errors[] = {
+static char * json_errors[] = {
     ERRORS
 };
 #undef X
@@ -144,10 +149,10 @@ char * json_errors[] = {
 #undef WHITESPACE
 #undef ERRORS
 
-char digit_starters[] = "-0123456789";
-char digits[] = "0123456789";
-char digits19[] = "123456789";
-char hexdigits[] = "0123456789abcdefABCDEF";
+static char digit_starters[] = "-0123456789";
+static char digits[] = "0123456789";
+static char digits19[] = "123456789";
+static char hexdigits[] = "0123456789abcdefABCDEF";
 
 enum states {
     EXPECT_VALUE,
@@ -185,7 +190,7 @@ enum json_mode {
 
 struct state {
     enum states cur_state;
-    unsigned char * cursor;
+    unsigned char * res cursor;
     enum json_errors error;
     int root_index;
     unsigned char string_pool[STRING_POOL_SIZE];
@@ -200,22 +205,22 @@ struct state {
 };
 
 /* Parsing */
-EXPORT int rjson(size_t len, struct state * res state);
+EXPORT int rjson(size_t len, struct state * state);
 /* Output */
 #ifdef WANT_LIBC
 EXPORT char* print_debug(struct tokens * );
 #else
 #define print_debug(_) ""
 #endif
-EXPORT unsigned char *to_string_(struct tokens *tokens, int compact);
-#define to_string(tokens_) (char *)to_string_(tokens_, 0)
-#define to_string_compact(tokens_) (char *)to_string_(tokens_, 1)
+EXPORT unsigned char * res to_string_(struct tokens * res tokens, int compact);
+#define to_string(tokens_) (char * res)to_string_(tokens_, 0)
+#define to_string_compact(tokens_) (char * res)to_string_(tokens_, 1)
 /* Building */
 EXPORT void start_string(unsigned int *, const unsigned char [STRING_POOL_SIZE]);
-EXPORT void push_string(const unsigned int *cursor, unsigned char *pool, char* string, int length);
-EXPORT void close_root(struct token *, int *);
-EXPORT void push_root(int *, const int *);
-EXPORT void push_token(enum kind , void * , struct token (*), int * , int);
+EXPORT void push_string(const unsigned int * res cursor, unsigned char * res pool, char* res string, int length);
+EXPORT void close_root(struct token * res, int * res);
+EXPORT void push_root(int * res, const int * res);
+EXPORT void push_token(enum kind , void * res, struct token (* res), int * res, int);
 /* EZ JSON */
 #define START_STRING(state_) start_string(&(state_)->string_cursor, (state_)->string_pool)
 #define PUSH_STRING(state_, string_, length_) push_string(&(state_)->string_cursor, (state_)->string_pool, (string_), (length_))
@@ -226,19 +231,21 @@ EXPORT void push_token(enum kind , void * , struct token (*), int * , int);
 #define START_AND_PUSH_TOKEN(state, kind, string) START_STRING(state); PUSH_STRING(state, string, (sizeof string) - 1); PUSH_STRING_TOKEN(kind, state)
 /* __/ */
 
+
 /* Stripped header guard. */
 
 
-static inline int in(char* hay, unsigned char needle) {
+static inline size_t in(char* res hay, unsigned char needle) {
     if (needle == '\0') return 0;
+    char * begin = hay;
     for (;*hay; hay++) {
-        if(*hay == needle) return 1;
+        if(*hay == needle) return (hay - begin) + 1;
     }
     return 0;
 }
 
 static inline size_t
-len_whitespace(unsigned char* string) {
+len_whitespace(unsigned char * res string) {
     int count = 0;
     while(in(whitespaces, string[count])) {
         count++;
@@ -247,12 +254,12 @@ len_whitespace(unsigned char* string) {
 }
 
 static inline size_t
-remaining(unsigned char *max, unsigned char *where) {
+remaining(unsigned char * res max, unsigned char * res where) {
     return max - where;
 }
 
 EXPORT void
-start_string(unsigned int * cursor,
+start_string(unsigned int * res cursor,
              const unsigned char pool[STRING_POOL_SIZE]) {
     *cursor += pool[*cursor] + 1;
 }
@@ -290,7 +297,7 @@ push_token(  // fixme
 }
 
 EXPORT int
-rjson(size_t len, struct state * res state) {
+rjson(size_t len, struct state * state) {
 
 #define peek_at(where) state->cursor[where]
 #define SET_STATE_AND_ADVANCE_BY(which_, advance_) \
@@ -303,11 +310,15 @@ rjson(size_t len, struct state * res state) {
     START_AND_PUSH_TOKEN(state, ROOT, "#root");
 
     // fixme: complete example with self managed memory.
-    // todo: fully test reentrance
+    // todo: fully test reentry
     // todo: make ANSI/STDC compatible
     // todo: complete unicode support?
     // todo: add jasmine mode? aka not copy strings+numbers ?
     // todo: pedantic mode?
+    // fixme: the cursor shouldn't advance on error
+    // fixme: tokenizer macro functions should be functions
+    // fixme: discard BOM
+    // todo: test for overflows
 
     if (state->cursor == 0) {
         state->error = JSON_ERROR_NO_ERRORS;
@@ -371,7 +382,7 @@ rjson(size_t len, struct state * res state) {
                             len_whitespace(state->cursor)+sizeof("null") - 1
                             );
                 }
-                else if (tokens[state->root_index]->kind != ROOT) {
+                else if (state->tokens.tokens_stack[state->root_index].kind != ROOT) {
                     state->error = JSON_ERROR_ASSOC_EXPECT_VALUE;
                 }
                 else if (remaining(final, state->cursor)) {
@@ -441,15 +452,7 @@ rjson(size_t len, struct state * res state) {
                 break;
             }
             case LITERAL_ESCAPE: {
-                if (peek_at(0) == '\\') {
-                    PUSH_STRING(state, (char[]) {peek_at(0)}, 1);
-                    SET_STATE_AND_ADVANCE_BY(IN_STRING, 1);
-                }
-                else if (peek_at(0) == '"') {
-                    PUSH_STRING(state, (char[]) {peek_at(0)}, 1);
-                    SET_STATE_AND_ADVANCE_BY(IN_STRING, 1);
-                }
-                else if (peek_at(0) == '/') {
+                if (in("\\\"/", peek_at(0))) {
                     PUSH_STRING(state, (char[]) {peek_at(0)}, 1);
                     SET_STATE_AND_ADVANCE_BY(IN_STRING, 1);
                 }
@@ -462,8 +465,7 @@ rjson(size_t len, struct state * res state) {
                         state->error = JSON_ERROR_INCOMPLETE_UNICODE_ESCAPE;
                         break;
                     }
-                    PUSH_STRING(state, (char[]) {peek_at(0)}, 1);
-                    PUSH_STRING(state, (char*)state->cursor, 4);
+                    PUSH_STRING(state, (char*)state->cursor, 5);
                     SET_STATE_AND_ADVANCE_BY(IN_STRING, 5);
                     break;
                 }
@@ -474,33 +476,36 @@ rjson(size_t len, struct state * res state) {
                 break;
             }
             case IN_STRING: {
-                if (peek_at(0) == '\\')
-                {
-                    PUSH_STRING(state, (char[]) {peek_at(0)}, 1);
-                    SET_STATE_AND_ADVANCE_BY(LITERAL_ESCAPE, 1);
-                }
-                else if (peek_at(0) == '"')
-                {
-                    PUSH_STRING(state, (char[]) {peek_at(0)}, 1);
-                    SET_STATE_AND_ADVANCE_BY(CLOSE_STRING, 1);
-                }
-                else {
-                    PUSH_STRING(state, (char[]){peek_at(0)}, 1);
-                    SET_STATE_AND_ADVANCE_BY(IN_STRING, 1);
-                }
+                state->error = JSON_ERROR_UNESCAPED_CONTROL * (peek_at(0) < 0x20 && !in("\b\f\n\r\t", peek_at(0)));
+                PUSH_STRING(state, (char[]) {peek_at(0)}, state->error == JSON_ERROR_NO_ERRORS);
+                SET_STATE_AND_ADVANCE_BY(
+                        (
+                                (int[]){
+                                        IN_STRING,
+                                        LITERAL_ESCAPE,
+                                        CLOSE_STRING
+                                }[in("\\\"", peek_at(0))]),
+                        /*state->error == JSON_ERROR_NO_ERRORS);*/
+                        1);
 
                 break;
             }
+
             case START_NUMBER: {
-                if (peek_at(0) == '-') {
-                    PUSH_STRING(state, (char[]){peek_at(0)}, 1);
-                    SET_STATE_AND_ADVANCE_BY(NUMBER_AFTER_MINUS, 1);
-                } else {
-                    SET_STATE_AND_ADVANCE_BY(NUMBER_AFTER_MINUS, 0);
-                }
+                PUSH_STRING(
+                        state,
+                ((char[]){peek_at(0)}),
+                ((int[]){0, 1}[in("-", peek_at(0))])
+                    );
+                SET_STATE_AND_ADVANCE_BY(
+                    NUMBER_AFTER_MINUS,
+                    (
+                            (int[]){0, 1}[in("-", peek_at(0))])
+                    );
 
                 break;
             }
+
             case NUMBER_AFTER_MINUS:
             {
                 if (peek_at(0) == '0') {
@@ -516,25 +521,36 @@ rjson(size_t len, struct state * res state) {
                 break;
             }
             case IN_NUMBER: {
-                if (in(digits, peek_at(0))) {
-                    PUSH_STRING(state, (char[]){peek_at(0)}, 1);
-                    SET_STATE_AND_ADVANCE_BY(IN_NUMBER, 1);
-                } else {
-                    SET_STATE_AND_ADVANCE_BY(EXPECT_FRACTION, 0);
-                }
+                PUSH_STRING(
+                        state,
+                        (char[]){peek_at(0)},
+                        (in(digits, peek_at(0)) != 0)
+                );
+                SET_STATE_AND_ADVANCE_BY(
+                        ((int[]){
+                            EXPECT_FRACTION,
+                            IN_NUMBER}[in(digits, peek_at(0)) != 0]),
+                (in(digits, peek_at(0)) != 0)
+                );
 
                 break;
             }
             case EXPECT_FRACTION: {
-                if (peek_at(0) == '.') {
-                    PUSH_STRING(state, (char[]){peek_at(0)}, 1);
-                    SET_STATE_AND_ADVANCE_BY(IN_FRACTION, 1);
-                } else {
-                    SET_STATE_AND_ADVANCE_BY(EXPECT_EXPONENT, 0);
-                }
+                PUSH_STRING(
+                        state,
+                        (char[]){peek_at(0)},
+                        (peek_at(0) == '.')
+                );
+                SET_STATE_AND_ADVANCE_BY(
+                        ((int[]){
+                                EXPECT_EXPONENT,
+                                IN_FRACTION}[peek_at(0) == '.']),
+                        (peek_at(0) == '.')
+                );
 
                 break;
             }
+
             case EXPECT_EXPONENT: {
                 if (peek_at(0) == 'e' || peek_at(0) == 'E') {
                     PUSH_STRING(state, (char[]){peek_at(0)}, 1);
@@ -546,16 +562,22 @@ rjson(size_t len, struct state * res state) {
 
                 break;
             }
+
             case IN_FRACTION: {
-                if (in(digits, peek_at(0))) {
-                    PUSH_STRING(state, (char[]){peek_at(0)}, 1);
-                    SET_STATE_AND_ADVANCE_BY(IN_FRACTION_DIGIT, 1);
-                } else {
-                    state->error = JSON_ERROR_INVALID_NUMBER;
-                }
+                state->error = JSON_ERROR_INVALID_NUMBER * (in(digits, peek_at(0)) == 0);
+                PUSH_STRING(state,
+                            (char[]){peek_at(0)},
+                            state->error == JSON_ERROR_NO_ERRORS);
+                SET_STATE_AND_ADVANCE_BY(
+                        ((int[]){
+                            IN_FRACTION,
+                            IN_FRACTION_DIGIT
+                        }[state->error == JSON_ERROR_NO_ERRORS]),
+                        state->error == JSON_ERROR_NO_ERRORS);
 
                 break;
             }
+
             case IN_FRACTION_DIGIT: {
                 if (in(digits, peek_at(0))) {
                     PUSH_STRING(state, (char[]){peek_at(0)}, 1);
@@ -566,6 +588,7 @@ rjson(size_t len, struct state * res state) {
 
                 break;
             }
+
             case EXPONENT_EXPECT_PLUS_MINUS: {
                 if (peek_at(0) == '+' || peek_at(0) == '-') {
                     PUSH_STRING(state, (char[]){peek_at(0)}, 1);
@@ -576,6 +599,7 @@ rjson(size_t len, struct state * res state) {
 
                 break;
             }
+
             case EXPECT_EXPONENT_DIGIT: {
                 if (in(digits, peek_at(0))) {
                     PUSH_STRING(state, (char[]){peek_at(0)}, 1);
@@ -586,6 +610,7 @@ rjson(size_t len, struct state * res state) {
 
                 break;
             }
+
             case IN_EXPONENT_DIGIT: {
                 if (in(digits, peek_at(0))) {
                     PUSH_STRING(state, (char[]) {peek_at(0)}, 1);
@@ -597,6 +622,7 @@ rjson(size_t len, struct state * res state) {
 
                 break;
             }
+
             case ARRAY_AFTER_VALUE: {
                 if(peek_at(len_whitespace(state->cursor)) == ',') {
                     SET_STATE_AND_ADVANCE_BY(EXPECT_VALUE, len_whitespace(state->cursor) + 1);
@@ -609,12 +635,14 @@ rjson(size_t len, struct state * res state) {
 
                 break;
             }
+
             case ASSOC_AFTER_VALUE: {
                 CLOSE_ROOT(state);
                 SET_STATE_AND_ADVANCE_BY(AFTER_VALUE, len_whitespace(state->cursor));
 
                 break;
             }
+
             case ASSOC_EXPECT_KEY: {
                 if(peek_at(len_whitespace(state->cursor) + 0) == '"') {
                     START_STRING(state);
@@ -625,7 +653,8 @@ rjson(size_t len, struct state * res state) {
                 }
                 break;
             }
-            case CLOSE_STRING: {
+
+            case CLOSE_STRING: {  /* fixme: non advancing state */
                 PUSH_STRING_TOKEN(STRING, state);
                 if ((*tokens)[state->root_index].kind == OBJECT) {
                     PUSH_ROOT(state);
@@ -636,14 +665,17 @@ rjson(size_t len, struct state * res state) {
 
                 break;
             }
+
             case ASSOC_EXPECT_COLON: {
-                if(peek_at(len_whitespace(state->cursor)) == ':') {
-                    SET_STATE_AND_ADVANCE_BY(EXPECT_VALUE, len_whitespace(state->cursor) + 1);
-                } else {
-                    state->error = JSON_ERROR_ASSOC_EXPECT_COLON;
-                }
+                state->error = JSON_ERROR_ASSOC_EXPECT_COLON * (peek_at(len_whitespace(state->cursor)) != ':');
+                SET_STATE_AND_ADVANCE_BY(
+                        ((int[]){
+                            ASSOC_EXPECT_COLON,
+                            EXPECT_VALUE}[state->error == JSON_ERROR_NO_ERRORS]),
+                (len_whitespace(state->cursor) + 1) * (state->error == JSON_ERROR_NO_ERRORS));
                 break;
             }
+
             case ASSOC_AFTER_INNER_VALUE: {
                 if(peek_at(len_whitespace(state->cursor)) == ',') {
                     CLOSE_ROOT(state);
@@ -654,6 +686,7 @@ rjson(size_t len, struct state * res state) {
                 } else {
                     state->error = JSON_ERROR_ASSOC_EXPECT_VALUE;
                 }
+
                 break;
             }
         }
@@ -663,7 +696,7 @@ rjson(size_t len, struct state * res state) {
         }
     }
 
-    exit: return state->tokens.token_cursor;
+    exit: return state->error;
 #undef peek_at
 #undef SET_STATE_AND_ADVANCE_BY
 }
@@ -706,10 +739,6 @@ static char * print_ident(int ident, unsigned compact) {
     return ident_s;
 }
 
-/**
- * Turns \0 into \u0000, \/ into / , this makes json valid
- * but also helps to compare two json objects for equality.
- * */
 EXPORT size_t shortest_safe_string(unsigned char * target, const unsigned char * source, int bytecount) {
     if(!bytecount) return 0;
     int i;
@@ -738,14 +767,17 @@ EXPORT size_t shortest_safe_string(unsigned char * target, const unsigned char *
             *(target++) = hexdigits[n/16], *(target++) = hexdigits[n%16];
         }
         else if(n > 0xFF / 2) {  /* fixme: check for valid unicode, especially for low codepoints and >= 0x10000 */
-            /* todo: extended ascii support can be added here */
-            if(i == bytecount - 1 && (n & 0x80u) != 0x80) return *(target++) = '*', *(target++) = '*', *(target) = '*', -3;
-                    /* beginning of a unicode sequence at the end of the string */
-            *(target++) = n;  /* paste raw utf8 as is, fixme: convert utf16 surrogates into utf8,
-                               * anything \u encoded into utf8
-                               * +decode codepoint and find shortest utf8 encoding.
-                               * unsigned char decoded = (string[state->ordinal]&0x1Fu<<5u)|(string[state->ordinal+1]&0x7Fu);
-                               */
+            if( i == (bytecount - 1) && (n & 0x80u) != 0x80 /* beginning of a unicode sequence at the end of the string */
+            || (i > 0 && i < (bytecount - 1) && (n & 0x80u) == 0x80 && (source[i + 1] & 0x80u) != 0x80 && (source[i - 1] & 0x80u) != 0x80)/* isolated high order bytes */
+            )
+                *(target++) = '\xff', *(target++) = '\xfd';
+            else
+                *(target++) = n;  /* paste raw utf8 as is,
+                   * fixme: convert utf16 surrogates into utf8,
+                   * anything \u encoded into utf8
+                   * +decode codepoint and find shortest utf8 encoding.
+                   * unsigned char decoded = (string[state->ordinal]&0x1Fu<<5u)|(string[state->ordinal+1]&0x7Fu);
+                   */
         } else {
             *(target++) = n;
         }
@@ -754,8 +786,8 @@ EXPORT size_t shortest_safe_string(unsigned char * target, const unsigned char *
     return target - start;
 }
 
-EXPORT unsigned char *
-to_string_(struct tokens *tokens, int compact) {
+EXPORT unsigned char * res
+to_string_(struct tokens * res tokens, int compact) {
     // todo: make the caller handle the buffer
     struct token *stack = tokens->tokens_stack;
     int max = tokens->token_cursor;
@@ -826,5 +858,6 @@ to_string_(struct tokens *tokens, int compact) {
 #undef cat
 #undef cat_raw
 }
+
 
 #endif //JSON_JSON_H /* Automatically added header guard. */
