@@ -95,9 +95,9 @@ to an array of `token`s. If you don't it will use a global
 static array that can hold up to 8000 tokens - that value can be
 customized at compilation. 
 
-If you use your own custom buffer you have to clean it - 
-if you use the default one the parser will
-clean it automatically on each "fresh" switch state.
+If you use your own custom buffer you have to clean it. 
+If you use the default one the parser will
+clean it automatically on each new switch state.
 
 To allow this library to work with binary safe strings 
 you must provide their size in a separate parameter. 
@@ -131,7 +131,7 @@ a big numbers library.
 
 ## Fast
 
-Reasonably fast as by default memory fragmentation doesn't 
+By default memory fragmentation doesn't 
 happen as every parsed token is concatenated contiguously
 in memory. Memory is written only once and never moved.
 
@@ -165,8 +165,8 @@ print NaN or a value equal to +/-INT_MAX, no rounding,
 no truncation happens.
 
 By design, parsed elements keep the order in which
-they are parsed, and inserting data has to be done
-by the user through `memmove` semantics.
+they are parsed, and inserting data in the middle
+of the DOM has to be done through `memmove` semantics.
 
 You may use empty placeholders if you expect to insert data
 later in the middle of your DOM, as empty nodes are simply 
@@ -227,7 +227,7 @@ Doesn't support extended ASCII.
 Doesn't support UTF16 nor UTF32. 
 
 ## Bugs
-Report them on https://gitlab.com/Meithal/cisson/-/issues
+🐛Report them on https://gitlab.com/Meithal/cisson/-/issues
 
 ## Some reads
 * [json.org](https://www.json.org/)
