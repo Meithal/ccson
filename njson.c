@@ -534,8 +534,8 @@ EXPORT size_t shortest_safe_string(unsigned char * target, const unsigned char *
     return target - start;
 }
 
-EXPORT unsigned char *
-to_string_(struct tokens *tokens, int compact) {
+EXPORT unsigned char * res
+to_string_(struct tokens * res tokens, int compact) {
     // todo: make the caller handle the buffer
     struct token *stack = tokens->tokens_stack;
     int max = tokens->token_cursor;

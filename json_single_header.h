@@ -13,12 +13,9 @@
 || defined(__MINGW32__) \
 || defined(__MINGW64__))
 #define HAS_VLA
-#else
-#define _CRT_SECURE_NO_WARNINGS
 #endif
 
 #if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
-#define has_c99
 #define res restrict
 #else
 #define res

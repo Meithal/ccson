@@ -27,6 +27,7 @@ endif()
 add_compile_definitions(LAST_COMMIT_COUNT="${_var_LAST_COMMIT}")
 add_compile_definitions(LAST_COMMIT_HASH="${_var_LAST_COMMIT_HASH}")
 add_compile_definitions(CMAKE_GENERATOR="$CACHE{CMAKE_C_COMPILER}")
+add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
 
 project(Cisson
         VERSION "0.0.1.${_var_LAST_COMMIT}"

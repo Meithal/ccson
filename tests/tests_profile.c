@@ -2,9 +2,9 @@
 // Created by hurin on 11/11/2020.
 //
 
-#ifndef HAS_VLA
 #include "tests_profile.h"
 
+#ifndef NO_MSVC
 LONGLONG
 start_profiler() {
     LARGE_INTEGER frequency;
@@ -35,5 +35,20 @@ elapsed(LONGLONG start, LONGLONG frequency) {
 
     return elapsed_microseconds.QuadPart;
 }
+#else
+LONGLONG
+start_profiler() {
+    return 0LL;
+}
 
-#endif // HAS_VLA
+LONGLONG
+start_timer() {
+    return 0LL;
+}
+
+LONGLONG
+elapsed(LONGLONG start, LONGLONG frequency) {
+    return 0LL;
+}
+
+#endif
