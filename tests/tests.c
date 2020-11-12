@@ -5,8 +5,8 @@
 #include <string.h>
 
 struct {
-    char * str;
-    char * ref;
+    char const * str;
+    char const * ref;
 } valid_json[] = {
     "true", "true",                           /* 0 */
     "true  ", "true",                         /* 1 */
@@ -104,10 +104,11 @@ struct {
     "\"test 漫 \"", "\"test 漫 \"",                                                                         /* 58 */
     "\"\xFF\"", (char[]){'\"', '\xFF', '\xFD', '\"', '\0'},  /* invalid utf is replaced by \\uFFFD */      /* 59 */
     "\"\xAF\"", (char[]){'\"', '\xFF', '\xFD', '\"', '\0'},                                                /* 60 */
+    "12310000000000000033432.2E324342423423423224234234", "12310000000000000033432.2E324342423423423224234234",  /* 61 */
 };
 
 struct {
-    char * str;
+    char const * str;
     size_t size;
 } bin_safe_json[] = {
     {"\"fo\0o\"", sizeof("\"fo\0o\"") -1},
@@ -117,7 +118,7 @@ struct {
 };
 
 /* shouldn't be parsed as valid json */
-char * bogus_json[] = {
+char const * bogus_json[] = {
     "",
     " ",
     "<!-- comment -->",
@@ -252,12 +253,12 @@ int main(void) {
     printf("Timer frequency: %lld by second.\n", frequency);
 
     for (i = 0; i < sizeof(valid_json) / sizeof(valid_json[0]) ; i++) {
-        struct state state = {.cursor=(unsigned char*)valid_json[i].str};
+        struct state state = { 0 };
         long long start = start_timer();
-        rjson(cs_strlen(valid_json[i].str), &state);
+        enum json_errors error = rjson(cs_strlen(valid_json[i].str), (unsigned char*)valid_json[i].str, &state);
         long long end = elapsed(start, frequency);
         total_parse_time += end;
-        printf("%d: For >>> %s <<<, elapsed: %lld\n -> %s\n", i, valid_json[i].str, end, json_errors[state.error]);
+        printf("%d: For >>> %s <<<, elapsed: %lld\n -> %s\n", i, valid_json[i].str, end, json_errors[error]);
         printf("%s", print_debug(&state.tokens));
         start = start_timer();
         char* out = to_string(&state.tokens);
@@ -265,7 +266,7 @@ int main(void) {
         total_write_time += end;
         puts(out);
         fflush(stdout);
-        assert(state.error == JSON_ERROR_NO_ERRORS);
+        assert(error == JSON_ERROR_NO_ERRORS);
         if(strcmp(valid_json[i].ref, "___") != 0) {
             assert(strcmp(to_string_compact(&state.tokens), valid_json[i].ref) == 0);
         }
@@ -275,12 +276,12 @@ int main(void) {
 
     for (i = 0; i < sizeof(bogus_json) / sizeof(bogus_json[0]) ; i++) {
 
-        struct state state = {.cursor=(unsigned char*)bogus_json[i]};
+        struct state state = { 0 };
         long long start = start_timer();
-        rjson(cs_strlen(bogus_json[i]), &state);
+        enum json_errors error = rjson(cs_strlen(bogus_json[i]), (unsigned char*)bogus_json[i], &state);
         long long end = elapsed(start, frequency);
         total_parse_time += end;
-        printf("%d: For >>> %s <<<, elapsed: %lld\n -> %s\n", i, bogus_json[i], end, json_errors[state.error]);
+        printf("%d: For >>> %s <<<, elapsed: %lld\n -> %s\n", i, bogus_json[i], end, json_errors[error]);
         puts(print_debug(&state.tokens));
         start = start_timer();
         char* out = to_string(&state.tokens);
@@ -288,19 +289,19 @@ int main(void) {
         total_write_time += end;
         puts(out);
         fflush(stdout);
-        assert(state.error != JSON_ERROR_NO_ERRORS);
+        assert(error != JSON_ERROR_NO_ERRORS);
     }
 
     puts("\n\n\n*** BINARY SAFE ***");
 
     for (i = 0; i < sizeof(bin_safe_json) / sizeof(bin_safe_json[0]) ; i++) {
 
-        struct state state = {.cursor=(unsigned char*)bin_safe_json[i].str};
+        struct state state = { 0 };
         long long start = start_timer();
-        rjson(bin_safe_json[i].size, &state);
+        enum json_errors error = rjson(bin_safe_json[i].size, (unsigned char*)bin_safe_json[i].str, &state);
         long long end = elapsed(start, frequency);
         total_parse_time += end;
-        printf("%d: For >>> %s <<<, elapsed: %lld\n -> %s\n", i, bin_safe_json[i].str, end, json_errors[state.error]);
+        printf("%d: For >>> %s <<<, elapsed: %lld\n -> %s\n", i, bin_safe_json[i].str, end, json_errors[error]);
         puts(print_debug(&state.tokens));
         start = start_timer();
         char* out = to_string(&state.tokens);
@@ -308,7 +309,7 @@ int main(void) {
         total_write_time += end;
         puts(out);
         fflush(stdout);
-        assert(state.error == JSON_ERROR_UNESCAPED_CONTROL);
+        assert(error == JSON_ERROR_UNESCAPED_CONTROL);
     }
 
 #ifdef WANT_JSON1
@@ -329,6 +330,11 @@ int main(void) {
     /* "[1, 2, \"foo\", [1, 2], 4  ]  ", */
     puts("\n\n\n*** EX NIHILO ***");
     struct state state = {0};
+    memset(static_stack, 0, sizeof(static_stack));
+    memset(static_pool, 0, sizeof(static_pool));
+    state.tokens.tokens_stack = static_stack;
+    state.copies.string_pool = static_pool;
+
     START_AND_PUSH_TOKEN(&state, ROOT, "#custom root");
     START_AND_PUSH_TOKEN(&state, ARRAY, "[");
     PUSH_ROOT(&state);
@@ -355,8 +361,12 @@ int main(void) {
         _strerror_s(out, 80, "err");
         puts(out);
     }
-    fprintf(file, "Total parsing time: %lld ; %s %s - %s\n", total_parse_time, LAST_COMMIT_HASH, LAST_COMMIT_COUNT, CMAKE_GENERATOR);
-    fprintf(file, "Total Writing time: %lld ; %s %s - %s\n", total_write_time, LAST_COMMIT_HASH, LAST_COMMIT_COUNT, CMAKE_GENERATOR);
+    fprintf(
+            file,
+            "Total parsing time: %lld ; Writing: %lld ; %s %s - %s\n",
+            total_parse_time,
+            total_write_time,
+            LAST_COMMIT_HASH, LAST_COMMIT_COUNT, CMAKE_GENERATOR);
     fclose(file);
 #endif
 

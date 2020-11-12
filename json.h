@@ -11,9 +11,13 @@
 || defined(__MINGW32__) \
 || defined(__MINGW64__))
 #define HAS_VLA
+#define va_(val) val
+#else
+#define va_(val)
 #endif
 
 #if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
+#define c99
 #define res restrict
 #else
 #define res
@@ -32,16 +36,16 @@
 #endif
 
 #ifndef WANT_LIBC
-/* from muslC */
+/* from MuslC */
 EXPORT size_t cisson_strlen(const unsigned char *s)
 {
     const unsigned char *a = s;
     for (; *s; s++);
     return s-a;
 }
-#define cs_strlen(s) (cisson_strlen((s)))
+#define cs_strlen(s) cisson_strlen((const unsigned char*)(s))
 
-/* from muslC */
+/* from MuslC */
 EXPORT void * cisson_memset(void *dest, int c, size_t n)
 {
     unsigned char *s = dest;
@@ -51,7 +55,7 @@ EXPORT void * cisson_memset(void *dest, int c, size_t n)
 }
 #define cs_memset(dest, val, repeat) (cisson_memset((dest), (val), (repeat)))
 
-/* from muslC */
+/* from MuslC */
 EXPORT void *cisson_memcpy(void *restrict dest, const void *restrict src, size_t n)
 {
     unsigned char *d = dest;
@@ -72,18 +76,20 @@ EXPORT void *cisson_memcpy(void *restrict dest, const void *restrict src, size_t
 /*****************************************************/
 
 
+enum kind {
+    UNSET,
+    ROOT,
+    TRUE,
+    FALSE,
+    JSON_NULL,
+    STRING,
+    NUMBER,
+    ARRAY,
+    OBJECT,
+};
+
 struct token {
-    enum kind {
-        UNSET,
-        ROOT,
-        TRUE,
-        FALSE,
-        JSON_NULL,
-        STRING,
-        NUMBER,
-        ARRAY,
-        OBJECT,
-    } kind;
+    enum kind kind;
     int root_index;
     unsigned char * address;
 };
@@ -130,13 +136,17 @@ enum whitespace_tokens { WHITESPACE };
 enum json_errors{ ERRORS };
 #undef X
 
+#ifdef c99
 #define X(a, b) [a] = b,
+#else
+#define X(a, b) b,
+#endif
 static char whitespaces[] = {
     WHITESPACE
     '\0',
 };
 
-static char * json_errors[] = {
+static char const * json_errors[] = {
     ERRORS
 };
 #undef X
@@ -150,6 +160,7 @@ static char digits19[] = "123456789";
 static char hexdigits[] = "0123456789abcdefABCDEF";
 
 enum states {
+    EXPECT_BOM,
     EXPECT_VALUE,
     AFTER_VALUE,
     OPEN_ARRAY,
@@ -183,24 +194,30 @@ enum json_mode {
 };
 #endif
 
+static struct token static_stack[MAX_TOKENS] = { 0 };
+static unsigned char static_pool[STRING_POOL_SIZE] = { 0 };
+
 struct state {
     enum states cur_state;
-    unsigned char * res cursor;
-    enum json_errors error;
     int root_index;
-    unsigned char string_pool[STRING_POOL_SIZE];
-    unsigned int string_cursor;
     struct tokens {
-        struct token tokens_stack[MAX_TOKENS];
+        struct token *tokens_stack;
         int token_cursor;
     } tokens;
+    struct copies {
+        unsigned char *string_pool;
+        unsigned int string_cursor;
+    } copies;
 #ifdef WANT_JSON1
     enum json_mode mode;
 #endif
 };
 
 /* Parsing */
-EXPORT int rjson(size_t len, struct state * state);
+EXPORT enum json_errors rjson(
+        size_t len,
+        unsigned char cursor[va_(len)],
+        struct state * state);
 /* Output */
 #ifdef WANT_LIBC
 EXPORT char* print_debug(struct tokens * );
@@ -215,15 +232,29 @@ EXPORT void start_string(unsigned int *, const unsigned char [STRING_POOL_SIZE])
 EXPORT void push_string(const unsigned int * res cursor, unsigned char * res pool, char* res string, int length);
 EXPORT void close_root(struct token * res, int * res);
 EXPORT void push_root(int * res, const int * res);
-EXPORT void push_token(enum kind , void * res, struct token (* res), int * res, int);
+EXPORT void push_token(enum kind , void * res, struct tokens (* res), int);
 /* EZ JSON */
-#define START_STRING(state_) start_string(&(state_)->string_cursor, (state_)->string_pool)
-#define PUSH_STRING(state_, string_, length_) push_string(&(state_)->string_cursor, (state_)->string_pool, (string_), (length_))
+#define START_STRING(state_) start_string(&(state_)->copies.string_cursor, (state_)->copies.string_pool)
+#define PUSH_STRING(state_, string_, length_) \
+    push_string(                               \
+        &(state_)->copies.string_cursor,             \
+        (state_)->copies.string_pool,                \
+        (string_),                             \
+        (length_))
 #define CLOSE_ROOT(state_) close_root((*state_).tokens.tokens_stack, &(*state_).root_index)
 #define PUSH_ROOT(state_) push_root(&(state_)->root_index, &(state_)->tokens.token_cursor)
-#define PUSH_TOKEN(kind_, address_, state_) push_token((kind_), (address_), (state_)->tokens.tokens_stack, &(state_)->tokens.token_cursor, (state_)->root_index)
-#define PUSH_STRING_TOKEN(kind_, state_) PUSH_TOKEN((kind_), (state_)->string_pool + (state_)->string_cursor, (state_))
-#define START_AND_PUSH_TOKEN(state, kind, string) START_STRING(state); PUSH_STRING(state, string, (sizeof string) - 1); PUSH_STRING_TOKEN(kind, state)
+#define PUSH_TOKEN(kind_, address_, state_) \
+    push_token(                             \
+        (kind_),                            \
+        (address_),                         \
+        &(state_)->tokens,                  \
+        (state_)->root_index)
+#define PUSH_STRING_TOKEN(kind_, state_) \
+    PUSH_TOKEN((kind_), (state_)->copies.string_pool + (state_)->copies.string_cursor, (state_))
+#define START_AND_PUSH_TOKEN(state, kind, string) \
+    START_STRING(state);               \
+    PUSH_STRING((state), string, (sizeof string) - 1); \
+    PUSH_STRING_TOKEN(kind, state)
 /* __/ */
 
 

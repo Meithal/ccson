@@ -20,6 +20,8 @@ execute_process(
 if(_var_res)
     set(_var_LAST_COMMIT, "0")
 else()
+    # fixme: use that instead:
+    # https://cmake.org/cmake/help/latest/command/add_custom_command.html#build-events
     set_property(GLOBAL APPEND
             PROPERTY CMAKE_CONFIGURE_DEPENDS
             "${CMAKE_SOURCE_DIR}/.git/index")
@@ -47,7 +49,7 @@ if(RUN_TESTS)
         set(PROFILE_FILES tests/tests_profile.c tests/tests_profile.h)
     endif()
     add_executable(tests ${PROFILE_FILES} tests/tests.c)
-    target_link_libraries(tests njson)
+    target_link_libraries(tests json)
 endif()
 
 option(WANT_SINGLE_HEADER_LIB "Generate a single header file by concatenating 2 files." ON)
@@ -74,6 +76,9 @@ option(WANT_LIBC "Use LibC." ON)
 if(WANT_LIBC)
     add_compile_definitions("WANT_LIBC")
 endif()
+set(CMAKE_C_STANDARD_LIBRARIES "")
+# skip all the default libraries in any case
 
-add_library(njson SHARED json.h njson.c)
+add_library(xjson SHARED json.h njson.c)
+add_library(json STATIC json.h njson.c)
 
