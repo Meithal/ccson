@@ -37,9 +37,11 @@ int main(void) {
 
 ```
 
+More examples of up-to-date usage can be found in `tests/tests.c`.
+
 If you want to compile it as a separate library or a runtime
-library you need [Cmake](https://cmake.org/) executable 
-accessible in you windows `PATH`. From the root folder type
+library you need the [Cmake](https://cmake.org/) executable 
+accessible in you Windows/Linux `PATH`. From the root folder type
 
 ```
 mkdir build
@@ -55,7 +57,7 @@ cmake --build . --config Release
 Comes as a single header file and doesn't have any dependency
 (even on stdlib). Logic is under 400 loc.
 Can be tinkered for more advanced uses such as a static library, 
-a runtime library (DLL), to use true stdlib functions, to
+a runtime library (DLL); to use true stdlib functions; to
 run tests and profiling.
 
 ## Conform
@@ -70,15 +72,6 @@ Benchmarks for JSON conformance can be found on [rapidJSON
 project](https://github.com/miloyip/nativejson-benchmark),
 or [JSONTestSuite](https://github.com/nst/JSONTestSuite).
 
-It appears that the only C library with more than 80%
-conformance today is
-[ccan/json](https://github.com/rustyrussell/ccan/)
-
-Compared to other libraries in C, this library 
-is more than 90% conforming and possibly the most
-conforming C library. It mostly lacks UTF16 and UTF32 support
-as it tries to focus on UTF8 for now.
-
 ## Resilient
 
 All the parser needs is a pointer to a string containing valid
@@ -88,13 +81,13 @@ Parsing is single pass and will never look back.
 When it has to look forth and can't,
 it will return; which means you can't fragment your JSON
 between true/false/null tokens of between unicode escape
-points (`\uXXXX`). That's a known limit.
+points (`\uXXXX`). That's a known limitation.
 
 To allow reentry, you can optionally pass in a `state` structure
 pointer that will keep the current switch state the parser was in, you 
 can reuse this pointer to "resume" parsing in the state the
-parser was previously stopped. If you don't the state will be
-held in a global static variable that is not thread safe.
+parser had previously stopped at. If you provide a NULL pointer,
+the state will be held in a global static variable that is not thread safe.
 
 To know where the parser will write all the tokens
 it finds you can provide it a pointer
@@ -102,14 +95,14 @@ to an array of `token`s. If you don't it will use a global
 static array that can hold up to 8000 tokens - that value can be
 customized at compilation. 
 
-If you use your own custom buffer you have to make sure 
-it is clean; if you use the default one the parser will
+If you use your own custom buffer you have to clean it - 
+if you use the default one the parser will
 clean it automatically on each "fresh" switch state.
 
 To allow this library to work with binary safe strings 
 you must provide their size in a separate parameter. 
 A macro function does that for you
-by simply calling `strlen()` on your cursor. 
+by simply calling `strlen()` on the cursor. 
 If you have to work with binary 
 unsafe string you want to NOT use the macro function, but provide
 the actual size either from `sizeof(string) - 1` or from
@@ -123,28 +116,24 @@ lib is a pointer to a utf8 string.
 No recursion is involved, so no risk of 
 stack busting from untrusted input.
 
-200 tests cover both valid and invalid cases. 
+200 tests cover both valid and invalid cases, no dynamic 
+memory is used in the core library. The size of the pool
+of static memory the library work with can be customized 
+or disabled completely if you want to supply it your 
+own buffers (from eg. malloc).
 
-No dynamic memory is used, instead work is done in a small 
-pool of static memory that should cover most use cases. 
-Its size can be customized or disabled completely 
-if you want to supply it your own buffers (from eg. malloc).
-
-Strings are binary write safe and read safe. 
+Strings are binary write-safe and read-safe. 
 Even if null characters (`\0`) are not allowed
 in JSON documents, the size of strings is stored apart. 
-The numbers are also stored as strings: it is let to the user to translate them
-to natives values using `strtod` or a big numbers library.
-
-The JSON standard doesn't impose any limit on how big 
-a number can be but the stored number will be semantically
-correct and can be consumed for example by the 
-`int()` function of python without error or loss.
+The numbers are also stored as strings: it is let to the 
+user to translate them to natives values using `strtod` or 
+a big numbers library.
 
 ## Fast
-By default memory fragmentation doesn't happen as every parsed token
-is concatenated contiguously. Memory is written only once and never
- moved.
+
+Reasonably fast as by default memory fragmentation doesn't 
+happen as every parsed token is concatenated contiguously
+in memory. Memory is written only once and never moved.
 
 If you maintain an external hashmap of fully qualified identifiers 
 (with a scripting language for example) you can get 
@@ -172,8 +161,7 @@ Data is not tampered with, specifically a JSON object of this shape
 ```
 
 A number that cannot be represented on a machine, will not 
-print NaN or a value equal to +/-INT_MAX, but will keep
-the initial significant digits intact, no rounding, 
+print NaN or a value equal to +/-INT_MAX, no rounding, 
 no truncation happens.
 
 By design, parsed elements keep the order in which
@@ -191,7 +179,7 @@ mentions that one should be able to "compare
 two JSON strings for equality". 
 To aid this task this library provides a `minified_string`
 function that tries to find the shortest shape a string
-can have: 
+can have. 
 `"\/"` becomes `"/"`; any escaped unicode is 
 replaced by its actual encoded unicode,
 except if a shorter representation exists.
@@ -244,7 +232,3 @@ Report them on https://gitlab.com/Meithal/cisson/-/issues
 ## Some reads
 * [json.org](https://www.json.org/)
 * [Parsing JSON is a Minefield 💣](http://seriot.ch/parsing_json.php)
-* Test suite: 
-[JSONTestSuite](https://github.com/nst/JSONTestSuite)
-* Other test suite: 
-[nativejson-benchmark](https://github.com/miloyip/nativejson-benchmark)
