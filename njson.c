@@ -93,7 +93,6 @@ rjson(size_t len,
     // todo: add jasmine mode? aka not copy strings+numbers ?
     // todo: pedantic mode?
     // fixme: tokenizer macro functions should be functions
-    // fixme: discard BOM
     // todo: test for overflows
     // fixme: check for bounds
     // todo: example with slowly filled array
@@ -101,7 +100,11 @@ rjson(size_t len,
     for(;;) {
         switch (state->cur_state) {
             case EXPECT_BOM: {
-                SET_STATE_AND_ADVANCE_BY(EXPECT_VALUE, 0);
+                if((char)peek_at(0) == '\xEF' && (char)peek_at(1) == '\xBB' && (char)peek_at(2) == '\xBF') {
+                    SET_STATE_AND_ADVANCE_BY(EXPECT_VALUE, 3);
+                } else {
+                    SET_STATE_AND_ADVANCE_BY(EXPECT_VALUE, 0);
+                }
                 break;
             }
 

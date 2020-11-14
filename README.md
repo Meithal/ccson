@@ -65,12 +65,11 @@ run tests and profiling.
 Today the best JSON library is considered to be 
 [RapidJSON](https://github.com/Tencent/rapidjson). The fastest
 library is [SIMD Json](https://github.com/simdjson/simdjson).
-Both are in C++, the later uses SIMD assembly instructions
-as its name implies.
+Both are in C++, the later uses SIMD assembly instructions.
 
 Benchmarks for JSON conformance can be found on [rapidJSON
-project](https://github.com/miloyip/nativejson-benchmark),
-or [JSONTestSuite](https://github.com/nst/JSONTestSuite).
+project](https://github.com/miloyip/nativejson-benchmark), or
+[JSONTestSuite](https://github.com/nst/JSONTestSuite).
 
 ## Resilient
 
@@ -173,7 +172,7 @@ later in the middle of your DOM, as empty nodes are simply
 skipped during printing.
 
 ## *Comparability*
-  
+
 [RFC8259](https://tools.ietf.org/html/rfc8259#section-8.3)
 mentions that one should be able to "compare
 two JSON strings for equality". 
@@ -193,7 +192,7 @@ Numbers could be shortened too, for example
 `100000` to `1e5`, `-0` replaced by `0`, and so on.
 But considered that the RFC mentions nothing about that matter, and 
 that ambiguous cases such as `100` and `1e2` exist, we keep 
-digits exactly how they are input.
+digits exactly how they are entered.
 
 If you keep those limitations in mind, you may use
 `minified_string()` + `strcmp()` to compare two 
@@ -221,14 +220,13 @@ Supports JSON 1 and 2, but also tries to follow RFC8259 guidelines.
 Np support for JSON 5.
 
 ## UTF 8, 16><, 32><
-Accepts UTF8 as long as it conforms to JSON syntax, 
-aka control characters must be escaped.
+Accepts UTF8 as long as it conforms to JSON syntax.
 Doesn't support extended ASCII. 
 Doesn't support UTF16 nor UTF32. 
 
 ## Bugs
 🐛Report them on https://gitlab.com/Meithal/cisson/-/issues
 
-## Some reads
+## Resources
 * [json.org](https://www.json.org/)
 * [Parsing JSON is a Minefield 💣](http://seriot.ch/parsing_json.php)

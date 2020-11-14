@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.14)
 
+message(STATUS "${CMAKE_PROJECT_NAME} version ${CMAKE_PROJECT_VERSION}")
+
 find_package(Git QUIET)
 
 execute_process(
@@ -38,9 +40,8 @@ project(Cisson
         LANGUAGES C)
 
 set(CMAKE_C_STANDARD 90)
-
-message(STATUS "${CMAKE_PROJECT_NAME} version ${CMAKE_PROJECT_VERSION}")
-
+add_library(xjson SHARED json.h njson.c)
+add_library(json STATIC json.h njson.c)
 
 option(RUN_TESTS "Build an executable that checks the library works on your machine (recommanded)" ON)
 if(RUN_TESTS)
@@ -52,7 +53,7 @@ if(RUN_TESTS)
     target_link_libraries(tests json)
 endif()
 
-option(WANT_SINGLE_HEADER_LIB "Generate a single header file by concatenating 2 files." ON)
+option(WANT_SINGLE_HEADER_LIB "Generate a single header file by concatenating 2 files." OFF)
 if(WANT_SINGLE_HEADER_LIB)
     include(concat.cmake OPTIONAL)
 endif()
@@ -77,8 +78,5 @@ if(WANT_LIBC)
     add_compile_definitions("WANT_LIBC")
 endif()
 set(CMAKE_C_STANDARD_LIBRARIES "")
-# skip all the default libraries in any case
 
-add_library(xjson SHARED json.h njson.c)
-add_library(json STATIC json.h njson.c)
 
