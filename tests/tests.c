@@ -54,9 +54,7 @@ struct {
     " \" à random string é with lower block characters.\"", "\" à random string é with lower block characters.\"",                          /* 43 */
     " \" \xCD\xBF random unicode string\"", "___",                                                           /* 44 */
     " \" a random string with \\u0000 correctly encoded null byte.\"", "\" a random string with \\u0000 correctly encoded null byte.\"",    /* 45 */
-    "{\r\n\t "                                                          /* 46 */
-        "\"foo\": \"bar\""
-    "}", "{\"foo\":\"bar\"}",
+    "{\r\n\t  \"foo\": \"bar\"}", "{\"foo\":\"bar\"}",
     "{\"foo\": 1, \"bar\": \"foo\"}", "{\"foo\":1,\"bar\":\"foo\"}",    /* 47 */
     "[1, 2, \"foo\", true]", "[1,2,\"foo\",true]",                      /* 48 */
     "{"                           /* 0 */
@@ -102,8 +100,10 @@ struct {
     "\"tést\"", "\"tést\"",                                                                            /* 55 */
     "\"expect shortcuts \\\", \\\\, \\/, \b, \f, \n, \r, \t  \"", "\"expect shortcuts \\\", \\\\, /, \\b, \\f, \\n, \\r, \\t  \"",   /* 56 */
     "\"test 漫 \"", "\"test 漫 \"",                                                                         /* 58 */
-    "\"\xFF\"", (char[]){'\"', '\xFF', '\xFD', '\"', '\0'},  /* invalid utf is replaced by \\uFFFD */      /* 59 */
-    "\"\xAF\"", (char[]){'\"', '\xFF', '\xFD', '\"', '\0'},                                                /* 60 */
+//    "\"\xFF\"", (char[]){'\"', '\xFF', '\xFD', '\"', '\0'},  /* invalid utf is replaced by \\uFFFD */      /* 59 */ This can be useful as an option
+//    "\"\xAF\"", (char[]){'\"', '\xFF', '\xFD', '\"', '\0'},                                                /* 60 */
+    "\"\xFF\"", (char[]){'\"', '\xFF', '\"', '\0'},  /* invalid utf is left as is. */                       /* 59 */
+    "\"\xAF\"", (char[]){'\"', '\xAF', '\"', '\0'},                                                         /* 60 */
     "12310000000000000033432.2E324342423423423224234234", "12310000000000000033432.2E324342423423423224234234",  /* 61 */
     (char[]){'\xEF', '\xBB',  '\xBF', '4', '2', '\0'}, "42"   /* 62 */
 };
@@ -119,6 +119,7 @@ struct {
 };
 
 /* shouldn't be parsed as valid json */
+/* todo: add expected error code for each */
 char const * bogus_json[] = {
     "",
     " ",
@@ -217,7 +218,7 @@ char const * bogus_json[] = {
     "[[[0]}]",
     "[0,[]",
     "[0,[],",
-    "\"no shortcuts \a, \v, \' \047 \"", "___",
+    "\"no shortcuts \a, \v, \' \047 \"",
     "[1, 2, 3,]",
     "[1, 2,, 3,]",
     "[1, 2, , 3,]",
@@ -232,7 +233,15 @@ char const * bogus_json[] = {
     "{\"a\" : 2 ,\"b\", }",
     "{\"a\" : 2 ,\"b\":, }",
     "{\"a\" : 2 ,\"b\": 3, }",
-    "\"no shortcuts \a, \v, \' \047 \"", "___",
+    "\"no shortcuts \a, \v, \' \047 \"",
+    "\"invalid escape \\x \"",
+    "\"invalid escape \\4 \"",
+    "\"incomplete escape \\u123 \"",
+    "\"incomplete escape \\u  \"",
+    "\"incomplete escape \\u-  \"",
+    "\"incomplete escape \\u1-  \"",
+    "\"incomplete escape \\u12-  \"",
+    "\"incomplete escape \\u123-  \"",
 };
 
 #ifdef WANT_JSON1
@@ -244,6 +253,7 @@ char * bogus_json1[] = {
 #endif
 
 int main(void) {
+    /* todo: interface with ctest */
     int i;
 
     puts("*** ALL SHOULD SUCCEED ***");
@@ -254,8 +264,8 @@ int main(void) {
     printf("Timer frequency: %lld by second.\n", frequency);
 
     for (i = 0; i < sizeof(valid_json) / sizeof(valid_json[0]) ; i++) {
-        struct state state = { 0 };
         long long start = start_timer();
+        struct state state = { 0 };
         enum json_errors error = rjson(cs_strlen(valid_json[i].str), (unsigned char*)valid_json[i].str, &state);
         long long end = elapsed(start, frequency);
         total_parse_time += end;
