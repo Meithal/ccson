@@ -254,6 +254,14 @@ int main(int argc, char** argv) {
     /* todo: interface with ctest */
     int i;
 
+    if (argc > 1) {
+        if (strcmp(argv[1], "--count-pass") == 0) {
+            return sizeof valid_json / sizeof valid_json[0];
+        }
+        if (strcmp(argv[1], "--count-fail") == 0) {
+            return sizeof bogus_json / sizeof bogus_json[0];
+        }
+    }
     puts("*** ALL SHOULD SUCCEED ***");
 
     long long frequency = start_profiler();

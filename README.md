@@ -1,5 +1,5 @@
 Cisson is a small JSON library in C that focuses on being
-non-disruptive.
+non-disruptive. It will not tamper with your data.
 
 It doesn't need a stdlib but can use it
 if it gives you better performance.
@@ -9,19 +9,19 @@ can compile and use recent features of C11 for
 better performance.
 
 ## Install
-You can copy the single header file
-`json_single_header.h` next to your source file and
-`#include` it.
+The most easy way to use this library is the header-only file
+`json_single_header.h`. You include it or copy/paste its contents
+in the file you need the JSON feature. 
 
-For more advanced use you must have CMake installed. The
-`add_subdirectory()` will generate a static and dynamic
-library, so your project may simply use `target_link_libraries()`
-with either target `sjson` or `xjson` to have your project
-use any of them.
+For use as a library you must have CMake installed. The
+default CmakeList script will generate a static and dynamic
+library.
+You have to use `target_link_libraries()` to use any of them.
+`sjson` is the static library target, 
+`xjson` is the dynamic library target.
 
-You may also bake this
-library by listing `json.h` and `njson.c` in your
-`add_executable` command.
+To bake cisson into your program, you can also list 
+`json.h` and `njson.c` in your `add_executable` command.
 
 This example shows how to use it as a static library.
 ```bash

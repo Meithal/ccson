@@ -179,7 +179,6 @@ enum states {
     EXPECT_EXPONENT_DIGIT,
     IN_EXPONENT_DIGIT,
     ARRAY_AFTER_VALUE,
-    ASSOC_AFTER_VALUE,
     ASSOC_EXPECT_KEY,
     CLOSE_STRING,
     ASSOC_EXPECT_COLON,
@@ -241,7 +240,7 @@ EXPORT void push_token(enum kind , void * res, struct tokens (* res), int);
         (state_)->copies.string_pool,                \
         (string_),                             \
         (length_))
-#define CLOSE_ROOT(state_) close_root((*state_).tokens.tokens_stack, &(*state_).root_index)
+#define CLOSE_ROOT(state_) close_root((*(state_)).tokens.tokens_stack, &(*(state_)).root_index)
 #define PUSH_ROOT(state_) push_root(&(state_)->root_index, &(state_)->tokens.token_cursor)
 #define PUSH_TOKEN(kind_, address_, state_) \
     push_token(                             \
@@ -253,7 +252,7 @@ EXPORT void push_token(enum kind , void * res, struct tokens (* res), int);
     PUSH_TOKEN((kind_), (state_)->copies.string_pool + (state_)->copies.string_cursor, (state_))
 #define START_AND_PUSH_TOKEN(state, kind, string) \
     START_STRING(state);               \
-    PUSH_STRING((state), string, (sizeof string) - 1); \
+    PUSH_STRING((state), string, (sizeof (string)) - 1); \
     PUSH_STRING_TOKEN(kind, state)
 /* __/ */
 

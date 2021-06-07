@@ -35,7 +35,10 @@ push_string(const unsigned int *cursor,
             unsigned char *pool,
             char* string,
             int length) {
-    cs_memcpy(pool + *cursor + 1 + pool[*cursor], string, length);
+    cs_memcpy(
+            pool + *cursor + 1 + pool[*cursor],
+            string,
+            length);
     pool[*cursor] += length;
 }
 
@@ -96,11 +99,17 @@ rjson(size_t len,
     // todo: test for overflows
     // fixme: check for bounds
     // todo: example with slowly filled array
+    // todo: no memory move mode (simple tokenizer)
+    // todo: add a dom query function.
 
     for(;;) {
         switch (state->cur_state) {
             case EXPECT_BOM: {
-                if((char)peek_at(0) == '\xEF' && (char)peek_at(1) == '\xBB' && (char)peek_at(2) == '\xBF') {
+                if(
+                        (char)peek_at(0) == '\xEF'
+                        && (char)peek_at(1) == '\xBB'
+                        && (char)peek_at(2) == '\xBF'
+                        ) {
                     SET_STATE_AND_ADVANCE_BY(EXPECT_VALUE, 3);
                 } else {
                     SET_STATE_AND_ADVANCE_BY(EXPECT_VALUE, 0);
@@ -190,9 +199,6 @@ rjson(size_t len,
                 else if(state->tokens.tokens_stack[state->root_index].kind == ARRAY) {
                     SET_STATE_AND_ADVANCE_BY(ARRAY_AFTER_VALUE, 0);
                 }
-                else if(state->tokens.tokens_stack[state->root_index].kind == OBJECT) {
-                    SET_STATE_AND_ADVANCE_BY(ASSOC_AFTER_VALUE, 0);
-                }
                 else if(state->tokens.tokens_stack[state->root_index].kind == STRING) {
                     SET_STATE_AND_ADVANCE_BY(ASSOC_AFTER_INNER_VALUE, 0);
                 }
@@ -232,6 +238,7 @@ rjson(size_t len,
                 break;
             }
             case LITERAL_ESCAPE: {
+                error = JSON_ERROR_INVALID_ESCAPE_SEQUENCE * !in("\\\"/u", peek_at(0));  /* u"\/ */
                 if (in("\\\"/", peek_at(0))) {
                     PUSH_STRING(state, (char[]) {peek_at(0)}, 1);
                     SET_STATE_AND_ADVANCE_BY(IN_STRING, 1);
@@ -416,13 +423,6 @@ rjson(size_t len,
                 break;
             }
 
-            case ASSOC_AFTER_VALUE: {
-                CLOSE_ROOT(state);
-                SET_STATE_AND_ADVANCE_BY(AFTER_VALUE, len_whitespace(cursor));
-
-                break;
-            }
-
             case ASSOC_EXPECT_KEY: {
                 if(peek_at(len_whitespace(cursor) + 0) == '"') {
                     START_STRING(state);
@@ -462,7 +462,8 @@ rjson(size_t len,
                     SET_STATE_AND_ADVANCE_BY(ASSOC_EXPECT_KEY, len_whitespace(cursor) + 1);
                 } else if (peek_at(len_whitespace(cursor)) == '}'){
                     CLOSE_ROOT(state);
-                    SET_STATE_AND_ADVANCE_BY(ASSOC_AFTER_VALUE, len_whitespace(cursor) + 1);
+                    CLOSE_ROOT(state);
+                    SET_STATE_AND_ADVANCE_BY(AFTER_VALUE, len_whitespace(cursor) +1);
                 } else {
                     error = JSON_ERROR_ASSOC_EXPECT_VALUE;
                 }
@@ -546,7 +547,7 @@ EXPORT size_t minified_string(unsigned char * target, const unsigned char * sour
             *(target++) = '\\', *(target++) = 'u', *(target++) = '0', *(target++) = '0';
             *(target++) = hexdigits[n/16], *(target++) = hexdigits[n%16];
         }
-        else if(n > 0xFF / 2) {  /* fixme: check for valid unicode, especially for low codepoints and >= 0x10000 */
+        else if(n > 0xFFFF / 24) {  /* fixme: check for valid unicode, especially for low codepoints and >= 0x10000 */
             if( i == (bytecount - 1) && (n & 0x80u) != 0x80 /* beginning of a unicode sequence at the end of the string */
             || (i > 0 && i < (bytecount - 1) && (n & 0x80u) == 0x80 && (source[i + 1] & 0x80u) != 0x80 && (source[i - 1] & 0x80u) != 0x80)/* isolated high order bytes */
             )
