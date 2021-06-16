@@ -19,12 +19,11 @@ The most easy way to use this library is to `#include
 cisson.h`. You must `#define CISSON_IMPLEMENTATION` 
 before including the library that way.
 
-For use as a library you must have CMake installed. The
-default CmakeList script will generate a static and dynamic
-library.
-You have to use `target_link_libraries()` to use any of them.
+To use cisson as a library you must have CMake installed.
 `sjson` is the static library target, 
 `xjson` is the dynamic library target.
+You can use `target_link_libraries()` to link any of them to 
+your program.
 
 To bake cisson into your program, you can also list 
 `json.h` and `njson.c` in your `add_executable` command.
@@ -80,19 +79,22 @@ PUSH_ROOT(&cisson_state);
 START_AND_PUSH_TOKEN(&cisson_state, STRING, "\"bar\"");
 CLOSE_ROOT(&cisson_state);
 /* now the root is no more the key but the object */
+START_AND_PUSH_TOKEN(&cisson_state, STRING, "\"array\"");
+PUSH_ROOT(&cisson_state);
 START_AND_PUSH_TOKEN(&cisson_state, ARRAY, "[");
 PUSH_ROOT(&cisson_state);
 START_AND_PUSH_TOKEN(&cisson_state, NUMBER, "1");
 START_AND_PUSH_TOKEN(&cisson_state, NUMBER, "2");
 START_AND_PUSH_TOKEN(&cisson_state, NUMBER, "3");
-CLOSE_ROOT(&cisson_state);
-CLOSE_ROOT(&cisson_state);
+CLOSE_ROOT(&cisson_state); /* the array */
+CLOSE_ROOT(&cisson_state); /* the object property */
 START_AND_PUSH_TOKEN(&cisson_state, STRING, "\"question\"");
 PUSH_ROOT(&cisson_state);
 START_AND_PUSH_TOKEN(&cisson_state, TRUE, "true");
 puts(to_string(&cisson_state.tokens));
 ```
-Note that closing tokens are not necessary. More and
+Note that closing tokens are not necessary if we have
+no more tokens to push. More and
 up-to-date examples are in tests/tests.c.
 
 We can notice that the nature of the JSON token we push onto the stack
