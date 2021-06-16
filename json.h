@@ -196,7 +196,7 @@ enum json_mode {
 static struct token static_stack[MAX_TOKENS] = { 0 };
 static unsigned char static_pool[STRING_POOL_SIZE] = { 0 };
 
-struct state {
+struct cisson_state {
     enum states cur_state;
     int root_index;
     struct tokens {
@@ -216,7 +216,7 @@ struct state {
 EXPORT enum json_errors rjson(
         size_t len,
         unsigned char cursor[va_(len)],
-        struct state * state);
+        struct cisson_state * state);
 /* Output */
 #ifdef WANT_LIBC
 EXPORT char* print_debug(struct tokens * );

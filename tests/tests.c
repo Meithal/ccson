@@ -240,6 +240,9 @@ struct{char const * st; int en; } bogus_json[] = {
     "\"incomplete escape \\u1-  \"", JSON_ERROR_INCOMPLETE_UNICODE_ESCAPE,
     "\"incomplete escape \\u12-  \"", JSON_ERROR_INCOMPLETE_UNICODE_ESCAPE,
     "\"incomplete escape \\u123-  \"", JSON_ERROR_INCOMPLETE_UNICODE_ESCAPE,
+    (char[]){'\xEF', '\xBB', '4', '2', '\0'}, JSON_ERROR_INVALID_CHARACTER, /* malformed UTF BOM */
+    (char[]){'\xEF', '4', '2', '\0'}, JSON_ERROR_INVALID_CHARACTER,
+    (char[]){'\xBB', '4', '2', '\0'}, JSON_ERROR_INVALID_CHARACTER,
 };
 
 #ifdef WANT_JSON1
@@ -262,6 +265,7 @@ int main(int argc, char** argv) {
             return sizeof bogus_json / sizeof bogus_json[0];
         }
     }
+
     puts("*** ALL SHOULD SUCCEED ***");
 
     long long frequency = start_profiler();
@@ -271,7 +275,7 @@ int main(int argc, char** argv) {
 
     for (i = 0; i < sizeof(valid_json) / sizeof(valid_json[0]) ; i++) {
         long long start = start_timer();
-        struct state state = { 0 };
+        struct cisson_state state = {0 };
         enum json_errors error = rjson(cs_strlen(valid_json[i].str), (unsigned char*)valid_json[i].str, &state);
         long long end = elapsed(start, frequency);
         total_parse_time += end;
@@ -293,7 +297,7 @@ int main(int argc, char** argv) {
 
     for (i = 0; i < sizeof(bogus_json) / sizeof(bogus_json[0]) ; i++) {
 
-        struct state state = { 0 };
+        struct cisson_state state = {0 };
         long long start = start_timer();
         enum json_errors error = rjson(cs_strlen(bogus_json[i].st), (unsigned char*)bogus_json[i].st, &state);
         long long end = elapsed(start, frequency);
@@ -313,7 +317,7 @@ int main(int argc, char** argv) {
 
     for (i = 0; i < sizeof(bin_safe_json) / sizeof(bin_safe_json[0]) ; i++) {
 
-        struct state state = { 0 };
+        struct cisson_state state = {0 };
         long long start = start_timer();
         enum json_errors error = rjson(bin_safe_json[i].size, (unsigned char*)bin_safe_json[i].str, &state);
         long long end = elapsed(start, frequency);
@@ -334,19 +338,19 @@ int main(int argc, char** argv) {
 
     for (i = 0; i < sizeof(bogus_json1) / sizeof(bogus_json1[0]) ; i++) {
 
-        struct state state = {.mode=JSON1};
-        int res = rjson((unsigned char*)bogus_json1[i], strlen(bogus_json1[i]) - 1, &state);
-        printf("For >>> %s <<<, \n -> %s\n", bogus_json1[i], json_errors[state.error]);
-        puts(print_debug(&state));
-        puts(to_string(*(state.tokens_stack), res));
+        struct cisson_state cisson_state = {.mode=JSON1};
+        int res = rjson((unsigned char*)bogus_json1[i], strlen(bogus_json1[i]) - 1, &cisson_state);
+        printf("For >>> %s <<<, \n -> %s\n", bogus_json1[i], json_errors[cisson_state.error]);
+        puts(print_debug(&cisson_state));
+        puts(to_string(*(cisson_state.tokens_stack), res));
         fflush(stdout);
-        assert(state.error == JSON_ERROR_JSON1_ONLY_ASSOC_ROOT);
+        assert(cisson_state.error == JSON_ERROR_JSON1_ONLY_ASSOC_ROOT);
     }
 #endif
 
     /* "[1, 2, \"foo\", [1, 2], 4  ]  ", */
     puts("\n\n\n*** EX NIHILO ***");
-    struct state state = {0};
+    struct cisson_state state = {0};
     memset(static_stack, 0, sizeof(static_stack));
     memset(static_pool, 0, sizeof(static_pool));
     state.tokens.tokens_stack = static_stack;

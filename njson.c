@@ -67,14 +67,14 @@ push_token(
 EXPORT enum json_errors
 rjson(size_t len,
       unsigned char cursor[va_(len)],
-      struct state * external_state) {
+      struct cisson_state * external_state) {
 
 #define peek_at(where) cursor[where]
 #define SET_STATE_AND_ADVANCE_BY(which_, advance_) \
   state->cur_state = which_; cursor += advance_
 
-    struct state local_state_ = { 0 };
-    struct state * state = &local_state_;
+    struct cisson_state local_state_ = {0 };
+    struct cisson_state * state = &local_state_;
     if(external_state != NULL) {
         state = external_state;
     }
@@ -101,6 +101,8 @@ rjson(size_t len,
     // todo: example with slowly filled array
     // todo: no memory move mode (simple tokenizer)
     // todo: add a dom query function.
+    // todo: implement JSON pointer RFC6901
+    // todo: implement JSON schema
 
     for(;;) {
         switch (state->cur_state) {

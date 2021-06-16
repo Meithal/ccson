@@ -1,17 +1,23 @@
-Cisson is a small JSON library in C that focuses on being
-non-disruptive. It will not tamper with your data.
+Cisson is a JSON library in C. It can serialize C objects
+into JSON and parse JSON into C objects.
 
-It doesn't need a stdlib but can use it
+It doesn't need a stdlib but can use one
 if it gives you better performance.
 
-It compiles by default in ANSI C but optionally
-can compile and use recent features of C11 for
+It compiles by default in ANSI C.
+It can compile and use recent features of C11 for
 better performance.
+
+## Requirements
+Tested on Windows and Linux, should compile with MSVC and GCC.
+Cmake is helpful to easily include this library in your project,
+but not required if you use the single-header version of it.
+No dependency, including LibC.
 
 ## Install
 The most easy way to use this library is the header-only file
-`json_single_header.h`. You include it or copy/paste its contents
-in the file you need the JSON feature. 
+`cisson.h`. You must `#define CISSON_IMPLEMENTATION` 
+before including the library that way.
 
 For use as a library you must have CMake installed. The
 default CmakeList script will generate a static and dynamic
@@ -26,9 +32,11 @@ To bake cisson into your program, you can also list
 This example shows how to use it as a static library.
 ```bash
 git clone https://gitlab.com/Meithal/cisson.git
+
 echo -e "add_subdirectory(cisson)\n"\
 "add_executable(my_exe my_source.c)\n"\ # this is your project
 "target_link_libraries(sjson my_exe)" > CmakeLists.txt
+
 mkdir build
 cd build
 cmake ..
@@ -37,34 +45,46 @@ cmake --build . --config Release
 ```
 
 ## Usage
-If we have a C object like this
+Having a C object like this
 ```c
 struct foo = {
-        .text = "text",
+        .foo = "bar",
         .array = {1, 2, 3}
 };
 ```
 we can turn it into JSON text like that
 ```c
-struct state state = {0};
+#define CISSON_IMPLEMENTATION
+#include "cisson.h"
+
+struct cisson_state cisson_state = {0};
+
 memset(static_stack, 0, sizeof(static_stack));
 memset(static_pool, 0, sizeof(static_pool));
-state.tokens.tokens_stack = static_stack;
-state.copies.string_pool = static_pool;
 
-START_AND_PUSH_TOKEN(&state, ROOT, "#custom root");
-START_AND_PUSH_TOKEN(&state, OBJECT, "{");
-PUSH_ROOT(&state);
-START_AND_PUSH_TOKEN(&state, STRING, "\"text\"");
-PUSH_ROOT(&state);
-START_AND_PUSH_TOKEN(&state, STRING, "\"text\"");
-CLOSE_ROOT(&state);
-CLOSE_ROOT(&state);
-START_AND_PUSH_TOKEN(&state, ARRAY, "[");
-PUSH_ROOT(&state);
-START_AND_PUSH_TOKEN(&state, NUMBER, "1");
-START_AND_PUSH_TOKEN(&state, NUMBER, "2");
-START_AND_PUSH_TOKEN(&state, NUMBER, "3");
-puts(to_string(&state.tokens));
+cisson_state.tokens.tokens_stack = static_stack;
+cisson_state.copies.string_pool = static_pool;
+
+START_AND_PUSH_TOKEN(&cisson_state, ROOT, "#custom root"); 
+/* every token we push will be bound to the current root */
+START_AND_PUSH_TOKEN(&cisson_state, OBJECT, "{");
+PUSH_ROOT(&cisson_state);                                  
+/* "PUSH_ROOT" will change the current root to the previously
+ * pushed token so every following
+ * token will be bound to the object token */ 
+START_AND_PUSH_TOKEN(&cisson_state, STRING, "\"foo\"");
+PUSH_ROOT(&cisson_state);
+/* next token will be bound to the key */ 
+START_AND_PUSH_TOKEN(&cisson_state, STRING, "\"bar\"");
+CLOSE_ROOT(&cisson_state);
+/* now the root is no more the key but the object */
+START_AND_PUSH_TOKEN(&cisson_state, ARRAY, "[");
+PUSH_ROOT(&cisson_state);
+START_AND_PUSH_TOKEN(&cisson_state, NUMBER, "1");
+START_AND_PUSH_TOKEN(&cisson_state, NUMBER, "2");
+START_AND_PUSH_TOKEN(&cisson_state, NUMBER, "3");
+puts(to_string(&cisson_state.tokens));
 ```
-Note that closing tokens are not necessary.
+Note that closing tokens are not necessary. More and
+up-to-date examples are in tests/tests.c.
+
