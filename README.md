@@ -91,7 +91,7 @@ CLOSE_ROOT(&cisson_state); /* the object property */
 START_AND_PUSH_TOKEN(&cisson_state, STRING, "\"question\"");
 PUSH_ROOT(&cisson_state);
 START_AND_PUSH_TOKEN(&cisson_state, TRUE, "true");
-puts(to_string(&cisson_state.tokens));
+puts(to_string(&cisson_state.tokens)); /* {"foo":"bar","array":[1,2,4],"question":true} */
 ```
 Note that closing tokens are not necessary if we have
 no more tokens to push. More and
@@ -131,7 +131,7 @@ int main() {
     push_token(&state, "\"question\"");
     push_token(&state, ":");
     push_token(&state, "true");
-    puts(to_string(&state.tokens));
+    puts(to_string_compact(&state.tokens)); /* {"foo":"bar","array":[1,2,4],"question":true} */
 
 }
 ```
