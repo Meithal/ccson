@@ -212,6 +212,10 @@ struct cisson_state {
 #endif
 };
 
+/* State maintenance */
+EXPORT void
+start_state(struct cisson_state * state, struct token *stack, size_t stack_size, unsigned char *pool, size_t pool_size);
+
 /* Parsing */
 EXPORT enum json_errors rjson(
         size_t len,

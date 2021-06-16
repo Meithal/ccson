@@ -79,8 +79,19 @@ push_token(struct cisson_state * state, char token[va_(static 1)]) {
         NUMBER, NUMBER, NUMBER, NUMBER, NUMBER, NUMBER,
         NUMBER, NUMBER, NUMBER, NUMBER, NUMBER, STRING}
         [in("#tfn[{-0123456789\"", token[0])];
-    START_AND_PUSH_TOKEN(state, kind, token);
-    if(in("{[", token[0])) PUSH_ROOT(state);
+    if(kind != UNSET) {
+        START_AND_PUSH_TOKEN(state, kind, token);
+    }
+    if(in("{[:", token[0])) PUSH_ROOT(state);
+}
+
+EXPORT void
+start_state(struct cisson_state * state, struct token *stack, size_t stack_size, unsigned char *pool, size_t pool_size) {
+    memset(state, 0, sizeof (struct cisson_state));
+    memset(stack, 0, stack_size);
+    memset(pool, 0, pool_size);
+    state->tokens.tokens_stack = stack;
+    state->copies.string_pool = pool;
 }
 
 EXPORT enum json_errors

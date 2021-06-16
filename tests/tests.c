@@ -351,10 +351,8 @@ int main(int argc, char** argv) {
     /* "[1, 2, \"foo\", [1, 2], 4  ]  ", */
     puts("\n\n\n*** EX NIHILO ***");
     struct cisson_state state = {0};
-    memset(static_stack, 0, sizeof(static_stack));
-    memset(static_pool, 0, sizeof(static_pool));
-    state.tokens.tokens_stack = static_stack;
-    state.copies.string_pool = static_pool;
+    start_state(&state, static_stack, sizeof static_stack,
+                static_pool, sizeof static_pool);
 
     START_AND_PUSH_TOKEN(&state, ROOT, "#custom root");
     START_AND_PUSH_TOKEN(&state, ARRAY, "[");
@@ -373,12 +371,8 @@ int main(int argc, char** argv) {
     assert(strcmp(to_string_compact(&state.tokens),"[1,2,\"foo\",[1,2],4]") == 0);
 
     puts("\n\n*** SMART EX NIHILO ***");
-    memset(&state, 0, sizeof state);
-    memset(static_stack, 0, sizeof(static_stack));
-    memset(static_pool, 0, sizeof(static_pool));
-    state.tokens.tokens_stack = static_stack;
-    state.copies.string_pool = static_pool;
-
+    start_state(&state, static_stack, sizeof static_stack,
+                static_pool, sizeof static_pool);
 
     push_token(&state, "#smart root");
     push_token(&state, "[");
@@ -393,6 +387,30 @@ int main(int argc, char** argv) {
     puts(to_string(&state.tokens));
     puts(to_string_compact(&state.tokens));
     assert(strcmp(to_string_compact(&state.tokens),"[1,2,\"foo\",[1,2],4]") == 0);
+
+    start_state(&state, static_stack, sizeof static_stack,
+                static_pool, sizeof static_pool);
+
+    push_token(&state, "#smart root"); /* only the leading # is necessary to signal a root */
+    push_token(&state, "{");
+    push_token(&state, "\"foo\"");
+    push_token(&state, ":");
+    push_token(&state, "\"bar\"");
+    push_token(&state, ">");
+    push_token(&state, "\"array\"");
+    push_token(&state, ":");
+    push_token(&state, "[");
+    push_token(&state, "1");
+    push_token(&state, "2");
+    push_token(&state, "4");
+    push_token(&state, ">>");
+    push_token(&state, "\"question\"");
+    push_token(&state, ":");
+    push_token(&state, "true");
+    puts(to_string(&state.tokens));
+    puts(to_string_compact(&state.tokens));
+    assert(strcmp(to_string_compact(&state.tokens),"{\"foo\":\"bar\",\"array\":[1,2,4],\"question\":true}") == 0);
+
 
 
 #ifndef HAS_VLA
