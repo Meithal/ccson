@@ -214,6 +214,10 @@ struct cisson_state {
 #endif
 };
 
+/* State maintenance */
+EXPORT void
+start_state(struct cisson_state * state, struct token *stack, size_t stack_size, unsigned char *pool, size_t pool_size);
+
 /* Parsing */
 EXPORT enum json_errors rjson(
         size_t len,
@@ -233,8 +237,10 @@ EXPORT void start_string(unsigned int *, const unsigned char [STRING_POOL_SIZE])
 EXPORT void push_string(const unsigned int * res cursor, unsigned char * res pool, char* res string, int length);
 EXPORT void close_root(struct token * res, int * res);
 EXPORT void push_root(int * res, const int * res);
-EXPORT void push_token_kind(enum kind kind, void *address
-                            res, struct tokens *tokens, int root_index);
+EXPORT void push_token_kind(enum kind kind, void *res address
+                            , struct tokens *tokens, int root_index);
+EXPORT void
+push_token(struct cisson_state * state, char token[va_(static 1)]);
 /* EZ JSON */
 #define START_STRING(state_) start_string(&(state_)->copies.string_cursor, (state_)->copies.string_pool)
 #define PUSH_STRING(state_, string_, length_) \
@@ -246,7 +252,7 @@ EXPORT void push_token_kind(enum kind kind, void *address
 #define CLOSE_ROOT(state_) close_root((*(state_)).tokens.tokens_stack, &(*(state_)).root_index)
 #define PUSH_ROOT(state_) push_root(&(state_)->root_index, &(state_)->tokens.token_cursor)
 #define PUSH_TOKEN(kind_, address_, state_) \
-    push_token(                             \
+    push_token_kind(                             \
         (kind_),                            \
         (address_),                         \
         &(state_)->tokens,                  \
@@ -255,7 +261,7 @@ EXPORT void push_token_kind(enum kind kind, void *address
     PUSH_TOKEN((kind_), (state_)->copies.string_pool + (state_)->copies.string_cursor, (state_))
 #define START_AND_PUSH_TOKEN(state, kind, string) \
     START_STRING(state);               \
-    PUSH_STRING((state), string, (sizeof (string)) - 1); \
+    PUSH_STRING((state), string, (cs_strlen (string))); \
     PUSH_STRING_TOKEN(kind, state)
 /* __/ */
 
@@ -319,7 +325,7 @@ push_root(int * root_index, const int * token_cursor) {
 }
 
 EXPORT void
-push_token(
+push_token_kind(
         enum kind kind,
         void * address,
         struct tokens *tokens,
@@ -327,6 +333,36 @@ push_token(
     tokens->tokens_stack[(tokens->token_cursor)++] = (struct token) {
         .kind=kind, .root_index=root_index, .address=address
     };
+}
+
+EXPORT void
+push_token(struct cisson_state * state, char token[va_(static 1)]) {
+    if(token[0] == '>') {
+        int i = 0;
+        while (token[i] && token[i] == '>') {
+            CLOSE_ROOT(state);
+            i++;
+        }
+        return;
+    }
+    enum kind kind = (enum kind[]){
+        UNSET, ROOT, TRUE, FALSE, JSON_NULL, ARRAY, OBJECT,
+        NUMBER, NUMBER, NUMBER, NUMBER, NUMBER, NUMBER,
+        NUMBER, NUMBER, NUMBER, NUMBER, NUMBER, STRING}
+        [in("#tfn[{-0123456789\"", token[0])];
+    if(kind != UNSET) {
+        START_AND_PUSH_TOKEN(state, kind, token);
+    }
+    if(in("{[:", token[0])) PUSH_ROOT(state);
+}
+
+EXPORT void
+start_state(struct cisson_state * state, struct token *stack, size_t stack_size, unsigned char *pool, size_t pool_size) {
+    memset(state, 0, sizeof (struct cisson_state));
+    memset(stack, 0, stack_size);
+    memset(pool, 0, pool_size);
+    state->tokens.tokens_stack = stack;
+    state->copies.string_pool = pool;
 }
 
 EXPORT enum json_errors
@@ -359,7 +395,7 @@ rjson(size_t len,
     // todo: make ANSI/STDC compatible
     // todo: complete unicode support?
     // todo: add jasmine mode? aka not copy strings+numbers ?
-    // todo: pedantic mode?
+    // todo: pedantic mode? (forbid duplicate keys, enforce order...)
     // fixme: tokenizer macro functions should be functions
     // todo: test for overflows
     // fixme: check for bounds
@@ -456,8 +492,8 @@ rjson(size_t len,
                     if (remaining(final, cursor + len_whitespace(cursor))) {
                         error = JSON_ERROR_NO_SIBLINGS;
 #ifdef WANT_JSON1
-                    } else if(cisson_state->mode == JSON1 && tokens[cisson_state->token_cursor-1].kind != OBJECT) {
-                        cisson_state->error = JSON_ERROR_JSON1_ONLY_ASSOC_ROOT;
+                    } else if(state->mode == JSON1 && tokens[state->token_cursor-1].kind != OBJECT) {
+                        state->error = JSON_ERROR_JSON1_ONLY_ASSOC_ROOT;
 #endif
                     } else {
                         goto exit;
@@ -539,7 +575,7 @@ rjson(size_t len,
                                         LITERAL_ESCAPE,
                                         CLOSE_STRING
                                 }[in("\\\"", peek_at(0))]),
-                        /*cisson_state->error == JSON_ERROR_NO_ERRORS);*/
+                        /*state->error == JSON_ERROR_NO_ERRORS);*/
                         1);
 
                 break;
@@ -701,7 +737,7 @@ rjson(size_t len,
                 break;
             }
 
-            case CLOSE_STRING: {  /* fixme: non advancing cisson_state */
+            case CLOSE_STRING: {  /* fixme: non advancing state */
                 PUSH_STRING_TOKEN(STRING, state);
                 if ((state->tokens.tokens_stack)[state->root_index].kind == OBJECT) {
                     PUSH_ROOT(state);
@@ -824,7 +860,7 @@ EXPORT size_t minified_string(unsigned char * target, const unsigned char * sour
                    * fixme: convert utf16 surrogates into utf8,
                    * anything \u encoded into utf8
                    * +decode codepoint and find shortest utf8 encoding.
-                   * unsigned char decoded = (string[cisson_state->ordinal]&0x1Fu<<5u)|(string[cisson_state->ordinal+1]&0x7Fu);
+                   * unsigned char decoded = (string[state->ordinal]&0x1Fu<<5u)|(string[state->ordinal+1]&0x7Fu);
                    */
         } else {
             *(target++) = n;
