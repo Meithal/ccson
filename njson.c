@@ -54,7 +54,7 @@ push_root(int * root_index, const int * token_cursor) {
 }
 
 EXPORT void
-push_token(
+push_token_kind(
         enum kind kind,
         void * address,
         struct tokens *tokens,
@@ -62,6 +62,25 @@ push_token(
     tokens->tokens_stack[(tokens->token_cursor)++] = (struct token) {
         .kind=kind, .root_index=root_index, .address=address
     };
+}
+
+EXPORT void
+push_token(struct cisson_state * state, char token[va_(static 1)]) {
+    if(token[0] == '>') {
+        int i = 0;
+        while (token[i] && token[i] == '>') {
+            CLOSE_ROOT(state);
+            i++;
+        }
+        return;
+    }
+    enum kind kind = (enum kind[]){
+        UNSET, ROOT, TRUE, FALSE, JSON_NULL, ARRAY, OBJECT,
+        NUMBER, NUMBER, NUMBER, NUMBER, NUMBER, NUMBER,
+        NUMBER, NUMBER, NUMBER, NUMBER, NUMBER, STRING}
+        [in("#tfn[{-0123456789\"", token[0])];
+    START_AND_PUSH_TOKEN(state, kind, token);
+    if(in("{[", token[0])) PUSH_ROOT(state);
 }
 
 EXPORT enum json_errors
@@ -94,7 +113,7 @@ rjson(size_t len,
     // todo: make ANSI/STDC compatible
     // todo: complete unicode support?
     // todo: add jasmine mode? aka not copy strings+numbers ?
-    // todo: pedantic mode?
+    // todo: pedantic mode? (forbid duplicate keys, enforce order...)
     // fixme: tokenizer macro functions should be functions
     // todo: test for overflows
     // fixme: check for bounds

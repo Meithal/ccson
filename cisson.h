@@ -233,7 +233,8 @@ EXPORT void start_string(unsigned int *, const unsigned char [STRING_POOL_SIZE])
 EXPORT void push_string(const unsigned int * res cursor, unsigned char * res pool, char* res string, int length);
 EXPORT void close_root(struct token * res, int * res);
 EXPORT void push_root(int * res, const int * res);
-EXPORT void push_token(enum kind , void * res, struct tokens (* res), int);
+EXPORT void push_token_kind(enum kind kind, void *address
+                            res, struct tokens *tokens, int root_index);
 /* EZ JSON */
 #define START_STRING(state_) start_string(&(state_)->copies.string_cursor, (state_)->copies.string_pool)
 #define PUSH_STRING(state_, string_, length_) \

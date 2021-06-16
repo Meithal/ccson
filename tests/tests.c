@@ -99,13 +99,13 @@ struct {
     "\"no\\\\ \\\"white\tspace\"", "\"no\\\\ \\\"white\\tspace\"",                                     /* 54 */
     "\"tést\"", "\"tést\"",                                                                            /* 55 */
     "\"expect shortcuts \\\", \\\\, \\/, \b, \f, \n, \r, \t  \"", "\"expect shortcuts \\\", \\\\, /, \\b, \\f, \\n, \\r, \\t  \"",   /* 56 */
-    "\"test 漫 \"", "\"test 漫 \"",                                                                         /* 58 */
-//    "\"\xFF\"", (char[]){'\"', '\xFF', '\xFD', '\"', '\0'},  /* invalid utf is replaced by \\uFFFD */      /* 59 */ This can be useful as an option
-//    "\"\xAF\"", (char[]){'\"', '\xFF', '\xFD', '\"', '\0'},                                                /* 60 */
-    "\"\xFF\"", (char[]){'\"', '\xFF', '\"', '\0'},  /* invalid utf is left as is. */                       /* 59 */
-    "\"\xAF\"", (char[]){'\"', '\xAF', '\"', '\0'},                                                         /* 60 */
+    "\"test 漫 \"", "\"test 漫 \"",                                                                              /* 58 */
+//    "\"\xFF\"", (char[]){'\"', '\xFF', '\xFD', '\"', '\0'},  /* invalid utf is replaced by \\uFFFD */          /* 59 */ This can be useful as an option
+//    "\"\xAF\"", (char[]){'\"', '\xFF', '\xFD', '\"', '\0'},                                                    /* 60 */
+    "\"\xFF\"", (char[]){'\"', '\xFF', '\"', '\0'},  /* invalid utf is left as is. */                            /* 59 */
+    "\"\xAF\"", (char[]){'\"', '\xAF', '\"', '\0'},                                                              /* 60 */
     "12310000000000000033432.2E324342423423423224234234", "12310000000000000033432.2E324342423423423224234234",  /* 61 */
-    (char[]){'\xEF', '\xBB',  '\xBF', '4', '2', '\0'}, "42"   /* 62 */
+    (char[]){'\xEF', '\xBB',  '\xBF', '4', '2', '\0'}, "42",   /* 62 */
 };
 
 struct {
@@ -371,6 +371,29 @@ int main(int argc, char** argv) {
     puts(to_string(&state.tokens));
     puts(to_string_compact(&state.tokens));
     assert(strcmp(to_string_compact(&state.tokens),"[1,2,\"foo\",[1,2],4]") == 0);
+
+    puts("\n\n*** SMART EX NIHILO ***");
+    memset(&state, 0, sizeof state);
+    memset(static_stack, 0, sizeof(static_stack));
+    memset(static_pool, 0, sizeof(static_pool));
+    state.tokens.tokens_stack = static_stack;
+    state.copies.string_pool = static_pool;
+
+
+    push_token(&state, "#smart root");
+    push_token(&state, "[");
+    push_token(&state, "1");
+    push_token(&state, "2");
+    push_token(&state, "\"foo\"");
+    push_token(&state, "[");
+    push_token(&state, "1");
+    push_token(&state, "2");
+    push_token(&state, ">");
+    push_token(&state, "4");
+    puts(to_string(&state.tokens));
+    puts(to_string_compact(&state.tokens));
+    assert(strcmp(to_string_compact(&state.tokens),"[1,2,\"foo\",[1,2],4]") == 0);
+
 
 #ifndef HAS_VLA
     printf("Total parsing time: %lld\n", total_parse_time);

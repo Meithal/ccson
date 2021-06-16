@@ -15,8 +15,8 @@ but not required if you use the single-header version of it.
 No dependency, including LibC.
 
 ## Install
-The most easy way to use this library is the header-only file
-`cisson.h`. You must `#define CISSON_IMPLEMENTATION` 
+The most easy way to use this library is to `#include
+cisson.h`. You must `#define CISSON_IMPLEMENTATION` 
 before including the library that way.
 
 For use as a library you must have CMake installed. The
@@ -28,6 +28,10 @@ You have to use `target_link_libraries()` to use any of them.
 
 To bake cisson into your program, you can also list 
 `json.h` and `njson.c` in your `add_executable` command.
+
+**Note**: If you use cisson through cmake, you must `#include json.h`
+instead of `cisson.h`, and you don't have to 
+`#define CISSON_IMPLEMENTATION` before including `json.h`.
 
 This example shows how to use it as a static library.
 ```bash

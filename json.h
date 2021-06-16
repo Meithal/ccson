@@ -231,7 +231,10 @@ EXPORT void start_string(unsigned int *, const unsigned char [STRING_POOL_SIZE])
 EXPORT void push_string(const unsigned int * res cursor, unsigned char * res pool, char* res string, int length);
 EXPORT void close_root(struct token * res, int * res);
 EXPORT void push_root(int * res, const int * res);
-EXPORT void push_token(enum kind , void * res, struct tokens (* res), int);
+EXPORT void push_token_kind(enum kind kind, void *res address
+                            , struct tokens *tokens, int root_index);
+EXPORT void
+push_token(struct cisson_state * state, char token[va_(static 1)]);
 /* EZ JSON */
 #define START_STRING(state_) start_string(&(state_)->copies.string_cursor, (state_)->copies.string_pool)
 #define PUSH_STRING(state_, string_, length_) \
@@ -243,7 +246,7 @@ EXPORT void push_token(enum kind , void * res, struct tokens (* res), int);
 #define CLOSE_ROOT(state_) close_root((*(state_)).tokens.tokens_stack, &(*(state_)).root_index)
 #define PUSH_ROOT(state_) push_root(&(state_)->root_index, &(state_)->tokens.token_cursor)
 #define PUSH_TOKEN(kind_, address_, state_) \
-    push_token(                             \
+    push_token_kind(                             \
         (kind_),                            \
         (address_),                         \
         &(state_)->tokens,                  \
@@ -252,7 +255,7 @@ EXPORT void push_token(enum kind , void * res, struct tokens (* res), int);
     PUSH_TOKEN((kind_), (state_)->copies.string_pool + (state_)->copies.string_cursor, (state_))
 #define START_AND_PUSH_TOKEN(state, kind, string) \
     START_STRING(state);               \
-    PUSH_STRING((state), string, (sizeof (string)) - 1); \
+    PUSH_STRING((state), string, (cs_strlen (string))); \
     PUSH_STRING_TOKEN(kind, state)
 /* __/ */
 
