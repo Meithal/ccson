@@ -18,18 +18,14 @@ If used as a single-header file, add
 ```
 on top of your file.
 
-To use cisson as a library CMake must be installed.
+To use cisson as a library, CMake must be installed.
 `sjson` is the static library target, 
 `xjson` is the dynamic library target.
 `target_link_libraries()` can link any of them to 
 a cmake target.
 
-To bake cisson, list `json.h` and `njson.c` in the 
-`add_executable` command.
-
-**Note**: If you use cisson through cmake, you must `#include json.h`
-instead of `cisson.h`, and you don't have to 
-`#define CISSON_IMPLEMENTATION` before including `json.h`.
+To bake cisson, `json.h` and `njson.c` must be listed in the 
+`add_executable` or `add_library` command.
 
 This example shows how to use it as a static library.
 ```bash
@@ -60,37 +56,39 @@ we can turn it into JSON text like that
 #define CISSON_IMPLEMENTATION
 #include "cisson.h"
 
-struct cisson_state cisson_state = {0};
-
-start_state(&state, static_stack, sizeof static_stack,
-            static_pool, sizeof static_pool);
-
-START_AND_PUSH_TOKEN(&cisson_state, ROOT, "#custom root"); 
-/* every token we push will be bound to the current root */
-START_AND_PUSH_TOKEN(&cisson_state, OBJECT, "{");
-PUSH_ROOT(&cisson_state);                                  
-/* "PUSH_ROOT" will change the current root to the previously
- * pushed token so every following
- * token will be bound to the object token */ 
-START_AND_PUSH_TOKEN(&cisson_state, STRING, "\"foo\"");
-PUSH_ROOT(&cisson_state);
-/* next token will be bound to the key */ 
-START_AND_PUSH_TOKEN(&cisson_state, STRING, "\"bar\"");
-CLOSE_ROOT(&cisson_state);
-/* now the root is no more the key but the object */
-START_AND_PUSH_TOKEN(&cisson_state, STRING, "\"array\"");
-PUSH_ROOT(&cisson_state);
-START_AND_PUSH_TOKEN(&cisson_state, ARRAY, "[");
-PUSH_ROOT(&cisson_state);
-START_AND_PUSH_TOKEN(&cisson_state, NUMBER, "1");
-START_AND_PUSH_TOKEN(&cisson_state, NUMBER, "2");
-START_AND_PUSH_TOKEN(&cisson_state, NUMBER, "3");
-CLOSE_ROOT(&cisson_state); /* the array */
-CLOSE_ROOT(&cisson_state); /* the object property */
-START_AND_PUSH_TOKEN(&cisson_state, STRING, "\"question\"");
-PUSH_ROOT(&cisson_state);
-START_AND_PUSH_TOKEN(&cisson_state, TRUE, "true");
-puts(to_string(&cisson_state.tokens)); /* {"foo":"bar","array":[1,2,4],"question":true} */
+int main(void) {
+    struct cisson_state cisson_state = {0};
+    
+    start_state(&state, static_stack, sizeof static_stack,
+    static_pool, sizeof static_pool);
+    
+    START_AND_PUSH_TOKEN(&cisson_state, ROOT, "#custom root");
+    /* every token we push will be bound to the current root */
+    START_AND_PUSH_TOKEN(&cisson_state, OBJECT, "{");
+    PUSH_ROOT(&cisson_state);
+    /* "PUSH_ROOT" will change the current root to the previously
+     * pushed token so every following
+     * token will be bound to the object token */
+    START_AND_PUSH_TOKEN(&cisson_state, STRING, "\"foo\"");
+    PUSH_ROOT(&cisson_state);
+    /* next token will be bound to the key */
+    START_AND_PUSH_TOKEN(&cisson_state, STRING, "\"bar\"");
+    CLOSE_ROOT(&cisson_state);
+    /* now the root is no more the key but the object */
+    START_AND_PUSH_TOKEN(&cisson_state, STRING, "\"array\"");
+    PUSH_ROOT(&cisson_state);
+    START_AND_PUSH_TOKEN(&cisson_state, ARRAY, "[");
+    PUSH_ROOT(&cisson_state);
+    START_AND_PUSH_TOKEN(&cisson_state, NUMBER, "1");
+    START_AND_PUSH_TOKEN(&cisson_state, NUMBER, "2");
+    START_AND_PUSH_TOKEN(&cisson_state, NUMBER, "3");
+    CLOSE_ROOT(&cisson_state); /* the array */
+    CLOSE_ROOT(&cisson_state); /* the object property */
+    START_AND_PUSH_TOKEN(&cisson_state, STRING, "\"question\"");
+    PUSH_ROOT(&cisson_state);
+    START_AND_PUSH_TOKEN(&cisson_state, TRUE, "true");
+    puts(to_string(&cisson_state.tokens)); /* {"foo":"bar","array":[1,2,4],"question":true} */
+}
 ```
 Closing tokens are not necessary if we have
 no more tokens to push. More and
@@ -101,13 +99,14 @@ can be deduced from its first character. For example `[` signals an object,
 `"` signals a string, and so on.
 The `push_token` function can guess the nature
 of the json token we want to add, without having to 
-provide its nature explicitly. If we had to rewrite the previous
-example using that function, it would look like the following
+provide its nature explicitly. We can rewrite the previous
+example like that
 
 ```c
 #include "json.h"
+
 int main() {
-    struct cisson_state cisson_state = {0};
+    struct cisson_state state = {0};
     
     start_state(&state, static_stack, sizeof static_stack,
                 static_pool, sizeof static_pool);
@@ -141,17 +140,20 @@ method, so, if more convenient, it may be slower.
 
 ```c
 #include "json.h"
+
 int main() {
-    struct cisson_state cisson_state = {0};
+    struct cisson_state state = {0};
     
     start_state(&state, static_stack, sizeof static_stack,
                 static_pool, sizeof static_pool);
 
     stream_tokens(&state, '~',
-        &(char[]){"#smart root~{~\"foo\"~:~\"bar\"~>~\"array\"~:~[~1~2~4~>>~\"question\"~:~true"}, 68 /* stream length */);
+        &(char[]){"#smart root~{~\"foo\"~:~\"bar\"~>~\"array\"~:~[~1~2~4~>>~\"question\"~:~true"}, 68);
     puts(to_string_compact(&state.tokens)); /* {"foo":"bar","array":[1,2,4],"question":true} */
 
 }
 ```
-`stream_tokens` will modify the stream contents in-place, 
-so we provide a compound literal instead of a static C string.
+
+We provide a separator character to use, a stream of
+tokens separated by the separator, and the total length 
+of the stream. The stream must be writeable.

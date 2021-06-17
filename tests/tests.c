@@ -1,8 +1,72 @@
+#ifndef CISSON_SINGLE_HEADER
 #include "../json.h"
-#include "tests_profile.h"
+#else
+#define CISSON_IMPLEMENTATION
+#include "../cisson.h"
+#endif
 #include <stdio.h>
 #include <assert.h>
 #include <string.h>
+
+#if (!(defined(_WIN32) || defined(_WIN64)) \
+|| defined(__CYGWIN__) \
+|| defined(__MINGW32__) \
+|| defined(__MINGW64__))
+#define LONGLONG long long
+#define NO_MSVC
+#else
+#include <Windows.h>
+#endif
+
+
+#ifndef NO_MSVC
+LONGLONG
+start_profiler() {
+    LARGE_INTEGER frequency;
+
+    QueryPerformanceFrequency(&frequency);
+
+    return frequency.QuadPart;
+}
+
+LONGLONG
+start_timer() {
+    LARGE_INTEGER starting_time;
+    QueryPerformanceCounter(&starting_time);
+
+    return starting_time.QuadPart;
+}
+
+LONGLONG
+elapsed(LONGLONG start, LONGLONG frequency) {
+    LARGE_INTEGER ending_time;
+    QueryPerformanceCounter(&ending_time);
+    LARGE_INTEGER elapsed_microseconds = {
+            .QuadPart=ending_time.QuadPart - start
+    };
+
+//    elapsed_microseconds.QuadPart *= 1000000;
+//    elapsed_microseconds.QuadPart /= frequency;
+
+    return elapsed_microseconds.QuadPart;
+}
+#else
+LONGLONG
+start_profiler() {
+    return 0LL;
+}
+
+LONGLONG
+start_timer() {
+    return 0LL;
+}
+
+LONGLONG
+elapsed(LONGLONG start, LONGLONG frequency) {
+    return 0LL;
+}
+
+#endif
 
 struct {
     char const * str;
@@ -256,6 +320,11 @@ char * bogus_json1[] = {
 int main(int argc, char** argv) {
     /* todo: interface with ctest */
     int i;
+
+#ifdef CISSON_SINGLE_HEADER
+    puts("Single header tests.");
+#endif
+
 
     if (argc > 1) {
         if (strcmp(argv[1], "--count-pass") == 0) {
