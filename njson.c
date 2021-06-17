@@ -86,7 +86,26 @@ push_token(struct cisson_state * state, char token[va_(static 1)]) {
 }
 
 EXPORT void
-start_state(struct cisson_state * state, struct token *stack, size_t stack_size, unsigned char *pool, size_t pool_size) {
+stream_tokens(struct cisson_state * state, char separator, char stream[va_(static 0)], size_t length) {
+    size_t i = 0;
+    while (i < length) {
+        size_t token_length = 0;
+        while (i + token_length < length && stream[i + token_length] != separator) {
+            token_length++;
+        }
+        stream[i + token_length] = '\0';
+        push_token(state, &stream[i]);
+        i = i + token_length + sizeof separator;
+    }
+}
+
+EXPORT void
+start_state(
+        struct cisson_state * state,
+        struct token *stack,
+        size_t stack_size,
+        unsigned char *pool,
+        size_t pool_size) {
     memset(state, 0, sizeof (struct cisson_state));
     memset(stack, 0, stack_size);
     memset(pool, 0, pool_size);

@@ -237,9 +237,11 @@ EXPORT void close_root(struct token * res, int * res);
 EXPORT void push_root(int * res, const int * res);
 EXPORT void push_token_kind(enum kind kind, void *res address
                             , struct tokens *tokens, int root_index);
+/* EZ JSON */
 EXPORT void
 push_token(struct cisson_state * state, char token[va_(static 1)]);
-/* EZ JSON */
+EXPORT void
+stream_tokens(struct cisson_state * state, char separator, char stream[va_(static 0)], size_t length);
 #define START_STRING(state_) start_string(&(state_)->copies.string_cursor, (state_)->copies.string_pool)
 #define PUSH_STRING(state_, string_, length_) \
     push_string(                               \

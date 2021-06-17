@@ -1,11 +1,7 @@
 Cisson is a JSON library in C. It can serialize C objects
 into JSON and parse JSON into C objects.
 
-It doesn't need a stdlib but can use one
-if it gives you better performance.
-
-It compiles by default in ANSI C.
-It can compile and use recent features of C11 for
+Can be compiled in ANSI C or in modern C for
 better performance.
 
 ## Requirements
@@ -15,18 +11,21 @@ but not required if you use the single-header version of it.
 No dependency, including LibC.
 
 ## Install
-The most easy way to use this library is to `#include
-cisson.h`. You must `#define CISSON_IMPLEMENTATION` 
-before including the library that way.
+If used as a single-header file, add
+```c
+#define CISSON_IMPLEMENTATION
+#include "cisson.h"
+```
+on top of your file.
 
-To use cisson as a library you must have CMake installed.
+To use cisson as a library CMake must be installed.
 `sjson` is the static library target, 
 `xjson` is the dynamic library target.
-You can use `target_link_libraries()` to link any of them to 
-your program.
+`target_link_libraries()` can link any of them to 
+a cmake target.
 
-To bake cisson into your program, you can also list 
-`json.h` and `njson.c` in your `add_executable` command.
+To bake cisson, list `json.h` and `njson.c` in the 
+`add_executable` command.
 
 **Note**: If you use cisson through cmake, you must `#include json.h`
 instead of `cisson.h`, and you don't have to 
@@ -93,18 +92,16 @@ PUSH_ROOT(&cisson_state);
 START_AND_PUSH_TOKEN(&cisson_state, TRUE, "true");
 puts(to_string(&cisson_state.tokens)); /* {"foo":"bar","array":[1,2,4],"question":true} */
 ```
-Note that closing tokens are not necessary if we have
+Closing tokens are not necessary if we have
 no more tokens to push. More and
 up-to-date examples are in tests/tests.c.
 
-We can notice that the nature of the JSON token we push onto the stack
+The nature of the JSON token we push onto the stack
 can be deduced from its first character. For example `[` signals an object,
 `"` signals a string, and so on.
-So, as a convenience, you can use the `push_token` function
-instead of the macros. `push_token` can guess the nature
-of the json token you want to add, without having you to 
-provide its nature explicitly, by looking at the first character
-of the token. If we had to rewrite the previous
+The `push_token` function can guess the nature
+of the json token we want to add, without having to 
+provide its nature explicitly. If we had to rewrite the previous
 example using that function, it would look like the following
 
 ```c
@@ -135,13 +132,26 @@ int main() {
 
 }
 ```
-`push_token` can deduce that it has to push a root when it encounters
-any of the `{`, `[`, `:` characters. It cannot however deduce when you 
-want to close a root. Since closing a root only changes
-an internal counter inside the state, it doesn't matter whether
-you push `}` or `]`, therefore we use the `>` symbol
-as an all-purpose root closer. 
-Note that you can close as many
-roots as you want in the token string. Note also that 
+The `>` symbol behaves as a root closer.
+
 `push_token` will use more computer cycles than the previous 
-method, so, if more convenient, you may find it slower.
+method, so, if more convenient, it may be slower.
+
+`stream_tokens` can be used to compress the previous code even further.
+
+```c
+#include "json.h"
+int main() {
+    struct cisson_state cisson_state = {0};
+    
+    start_state(&state, static_stack, sizeof static_stack,
+                static_pool, sizeof static_pool);
+
+    stream_tokens(&state, '~',
+        &(char[]){"#smart root~{~\"foo\"~:~\"bar\"~>~\"array\"~:~[~1~2~4~>>~\"question\"~:~true"}, 68 /* stream length */);
+    puts(to_string_compact(&state.tokens)); /* {"foo":"bar","array":[1,2,4],"question":true} */
+
+}
+```
+`stream_tokens` will modify the stream contents in-place, 
+so we provide a compound literal instead of a static C string.

@@ -411,6 +411,14 @@ int main(int argc, char** argv) {
     puts(to_string_compact(&state.tokens));
     assert(strcmp(to_string_compact(&state.tokens),"{\"foo\":\"bar\",\"array\":[1,2,4],\"question\":true}") == 0);
 
+    puts("\n\n*** STREAM EX NIHILO ***");
+    start_state(&state, static_stack, sizeof static_stack,
+                static_pool, sizeof static_pool);
+    stream_tokens(&state, '~',
+                  (char*)&(char[]){"#smart root~{~\"foo\"~:~\"bar\"~>~\"array\"~:~[~1~2~4~>>~\"question\"~:~true"}, 68 /* stream length */);
+    puts(to_string(&state.tokens));
+    puts(to_string_compact(&state.tokens));
+    assert(strcmp(to_string_compact(&state.tokens),"{\"foo\":\"bar\",\"array\":[1,2,4],\"question\":true}") == 0);
 
 
 #ifndef HAS_VLA
