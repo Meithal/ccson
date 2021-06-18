@@ -113,6 +113,63 @@ start_state(
     state->copies.string_pool = pool;
 }
 
+static int
+assoc_value(struct cisson_state * state, int token_idx) {
+    int i;
+    if (state->tokens.tokens_stack[token_idx].kind != STRING) {
+        return -1;
+    }
+    for(
+            i = (token_idx + 1) % state->tokens.token_cursor;
+            i != token_idx;
+            i++, i%=state->tokens.token_cursor) {
+        if (state->tokens.tokens_stack[i].root_index == token_idx) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+EXPORT int
+query(struct cisson_state * state, size_t length, char query[va_(length)]) {
+    size_t i = 0;
+    int token_index = 1;
+
+    while (i < length) {
+        if (query[i] == '/') {
+            if(state->tokens.tokens_stack[token_index].kind != OBJECT && state->tokens.tokens_stack[token_index].kind != ARRAY) {
+                return POINTER_NOT_FOUND;
+            }
+            i++;
+            size_t token_length = 0;
+            while (i + token_length < length && query[i + token_length] != '/') {
+                token_length++;
+            }
+            char buffer[0x80] = { '"' };
+            cs_memcpy(&buffer[1], &query[i], token_length);
+            buffer[1 + token_length] = '"';
+
+            struct token * token;
+            for (token = &state->tokens.tokens_stack[1]; token < &state->tokens.tokens_stack[state->tokens.token_cursor]; token++) {
+                if (token_index == token->root_index) {
+                    if (state->tokens.tokens_stack[token_index].kind == OBJECT) {
+                        if(cs_memcmp(token->address + 1, buffer, token_length) == 0) {
+                            return assoc_value(state, token - &state->tokens.tokens_stack[0]);
+                        }
+                    } else if (state->tokens.tokens_stack[token_index].kind == ARRAY) {
+                        // todo
+                    }
+                }
+            }
+
+            i = i + token_length;
+        }
+        i++;
+    }
+
+    return token_index;
+}
+
 EXPORT enum json_errors
 rjson(size_t len,
       unsigned char cursor[va_(len)],
@@ -619,7 +676,7 @@ EXPORT size_t minified_string(unsigned char * target, const unsigned char * sour
 }
 
 EXPORT unsigned char * res
-to_string_(struct tokens * res tokens, int compact) {
+to_string_(struct tokens * res tokens, int start, int compact) {
     // todo: make the caller handle the buffer
     struct token *stack = tokens->tokens_stack;
     int max = tokens->token_cursor;
@@ -636,21 +693,23 @@ to_string_(struct tokens * res tokens, int compact) {
     size_t cursor = 0;
     int ident = 0;
     int j;
-    for (j = 1; j < max; ++j) {
+    for (j = start; j < max; ++j) {
 
-        if(stack[j].kind == UNSET) {
+        if(stack[j].kind == UNSET || stack[j].kind == ROOT) {
             continue;
         }
 
-        if (stack[stack[j].root_index].kind == STRING) {
-            cursor += cat_raw(output + cursor, compact ? ":" : ": ");
-        } else {
+        if (stack[stack[j].root_index].kind != STRING) {
             cursor += cat_raw(output + cursor, print_ident(ident, compact));
         }
 
         unsigned char dest[STRING_POOL_SIZE] = {0};
         cs_memcpy(dest, (char*)stack[j].address + 1, *((char *) stack[j].address));
         cursor += cat(output + cursor, dest, &stack[j]);
+
+        if (stack[stack[j].root_index].kind == OBJECT) {
+            cursor += cat_raw(output + cursor, compact ? ":" : ": ");
+        }
 
         if(stack[j].kind == ARRAY || stack[j].kind == OBJECT) {
             cursor += cat_raw(output + cursor, compact ? "" : "\n");
@@ -683,6 +742,11 @@ to_string_(struct tokens * res tokens, int compact) {
                     }
                 }
             }
+
+            if(stack[j+1].root_index < stack[start].root_index) {
+                break;
+            }
+
             if (j + 1 < max && (
                stack[stack[j].root_index].kind == STRING || stack[stack[j].root_index].kind == ARRAY
             ) && stack[j].kind != ARRAY && stack[j].kind != OBJECT) {

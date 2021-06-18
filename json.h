@@ -1,5 +1,6 @@
 #ifndef JSON_JSON_H
 #define JSON_JSON_H
+
 #ifdef WANT_LIBC
 #include<stdio.h>
 #include<string.h>
@@ -45,7 +46,6 @@ EXPORT size_t cisson_strlen(const unsigned char *s)
 }
 #define cs_strlen(s) cisson_strlen((const unsigned char*)(s))
 
-/* from MuslC */
 EXPORT void * cisson_memset(void *dest, int c, size_t n)
 {
     unsigned char *s = dest;
@@ -55,7 +55,6 @@ EXPORT void * cisson_memset(void *dest, int c, size_t n)
 }
 #define cs_memset(dest, val, repeat) (cisson_memset((dest), (val), (repeat)))
 
-/* from MuslC */
 EXPORT void *cisson_memcpy(void *restrict dest, const void *restrict src, size_t n)
 {
     unsigned char *d = dest;
@@ -65,10 +64,20 @@ EXPORT void *cisson_memcpy(void *restrict dest, const void *restrict src, size_t
     return dest;
 }
 #define cs_memcpy(dest, val, repeat) (cisson_memcpy((dest), (val), (repeat)))
+
+EXPORT int cisson_memcmp(const void *vl, const void *vr, size_t n)
+{
+	const unsigned char *l=vl, *r=vr;
+	for (; n && *l == *r; n--, l++, r++);
+	return n ? *l-*r : 0;
+}
+#define cs_memcmp(v1, v2, size) (cisson_memcmp((v1), (v2), (size)))
+
 #else
 #define cs_strlen(s) (strlen((s)))
 #define cs_memset(dest, val, repeat) (memset((dest), (val), (repeat)))
 #define cs_memcpy(dest, val, repeat) (memcpy((dest), (val), (repeat)))
+#define cs_memcmp(v1, v2, size) (memcmp((v1), (v2), (size)))
 
 #endif  /* WANT_LIBC */
 
@@ -212,6 +221,11 @@ struct cisson_state {
 #endif
 };
 
+enum POINTER_ERRORS {
+    POINTER_WRONG_SYNTAX = -1,
+    POINTER_NOT_FOUND = -2
+};
+
 /* State maintenance */
 EXPORT void
 start_state(struct cisson_state * state, struct token *stack, size_t stack_size, unsigned char *pool, size_t pool_size);
@@ -227,9 +241,12 @@ EXPORT char* print_debug(struct tokens * );
 #else
 #define print_debug(_) ""
 #endif
-EXPORT unsigned char * res to_string_(struct tokens * res tokens, int compact);
-#define to_string(tokens_) (char * res)to_string_(tokens_, 0)
-#define to_string_compact(tokens_) (char * res)to_string_(tokens_, 1)
+EXPORT int
+query(struct cisson_state * state, size_t length, char query[va_(length)]);
+EXPORT unsigned char * res to_string_(struct tokens * res tokens, int start, int compact);
+#define to_string(tokens_) (char * res)to_string_(tokens_, 0, 0)
+#define to_string_compact(tokens_) (char * res)to_string_(tokens_, 0, 1)
+#define to_string_pointer(tokens_, pointer_) (char * res)to_string_(tokens_, pointer_, 1)
 /* Building */
 EXPORT void start_string(unsigned int *, const unsigned char [STRING_POOL_SIZE]);
 EXPORT void push_string(const unsigned int * res cursor, unsigned char * res pool, char* res string, int length);

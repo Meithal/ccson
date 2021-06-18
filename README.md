@@ -1,9 +1,6 @@
 Cisson is a JSON library in C. It can serialize C objects
 into JSON and parse JSON into C objects.
 
-Can be compiled in ANSI C or in modern C for
-better performance.
-
 ## Requirements
 Tested on Windows and Linux, should compile with MSVC and GCC.
 Cmake is helpful to easily include this library in your project,

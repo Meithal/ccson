@@ -214,6 +214,11 @@ struct cisson_state {
 #endif
 };
 
+enum POINTER_ERRORS {
+    POINTER_WRONG_SYNTAX = -1,
+    POINTER_NOT_FOUND = -2
+};
+
 /* State maintenance */
 EXPORT void
 start_state(struct cisson_state * state, struct token *stack, size_t stack_size, unsigned char *pool, size_t pool_size);
@@ -239,9 +244,11 @@ EXPORT void close_root(struct token * res, int * res);
 EXPORT void push_root(int * res, const int * res);
 EXPORT void push_token_kind(enum kind kind, void *res address
                             , struct tokens *tokens, int root_index);
+/* EZ JSON */
 EXPORT void
 push_token(struct cisson_state * state, char token[va_(static 1)]);
-/* EZ JSON */
+EXPORT void
+stream_tokens(struct cisson_state * state, char separator, char stream[va_(static 0)], size_t length);
 #define START_STRING(state_) start_string(&(state_)->copies.string_cursor, (state_)->copies.string_pool)
 #define PUSH_STRING(state_, string_, length_) \
     push_string(                               \
@@ -357,12 +364,46 @@ push_token(struct cisson_state * state, char token[va_(static 1)]) {
 }
 
 EXPORT void
-start_state(struct cisson_state * state, struct token *stack, size_t stack_size, unsigned char *pool, size_t pool_size) {
+stream_tokens(struct cisson_state * state, char separator, char stream[va_(static 0)], size_t length) {
+    size_t i = 0;
+    while (i < length) {
+        size_t token_length = 0;
+        while (i + token_length < length && stream[i + token_length] != separator) {
+            token_length++;
+        }
+        stream[i + token_length] = '\0';
+        push_token(state, &stream[i]);
+        i = i + token_length + sizeof separator;
+    }
+}
+
+EXPORT void
+start_state(
+        struct cisson_state * state,
+        struct token *stack,
+        size_t stack_size,
+        unsigned char *pool,
+        size_t pool_size) {
     memset(state, 0, sizeof (struct cisson_state));
     memset(stack, 0, stack_size);
     memset(pool, 0, pool_size);
     state->tokens.tokens_stack = stack;
     state->copies.string_pool = pool;
+}
+
+EXPORT int
+query(struct cisson_state * state, size_t length, char query[va_(length)]) {
+    size_t i = 0;
+    while (i < length) {
+        if (query[i] == '/') {
+            size_t token_length = 0;
+            while (i + token_length < length && query[i + token_length] != '/') {
+                token_length++;
+            }
+        }
+    }
+
+    return 0;
 }
 
 EXPORT enum json_errors

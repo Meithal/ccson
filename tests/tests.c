@@ -484,11 +484,20 @@ int main(int argc, char** argv) {
     start_state(&state, static_stack, sizeof static_stack,
                 static_pool, sizeof static_pool);
     stream_tokens(&state, '~',
-                  (char*)&(char[]){"#smart root~{~\"foo\"~:~\"bar\"~>~\"array\"~:~[~1~2~4~>>~\"question\"~:~true"}, 68 /* stream length */);
+                  (char*)&(char[]){"#stream root~{~\"foo\"~:~\"bar\"~>~\"array\"~:~[~1~2~4~>>~\"question\"~:~true~>~\"\"~:~null"}, 81 /* stream length */);
     puts(to_string(&state.tokens));
     puts(to_string_compact(&state.tokens));
-    assert(strcmp(to_string_compact(&state.tokens),"{\"foo\":\"bar\",\"array\":[1,2,4],\"question\":true}") == 0);
+    fflush(stdout);
+    assert(strcmp(to_string_compact(&state.tokens),"{\"foo\":\"bar\",\"array\":[1,2,4],\"question\":true,\"\":null}") == 0);
 
+    puts("\n\n*** POINTERS ***");
+    puts(to_string_pointer(&state.tokens, query(&state, 4, "/foo")));
+    fflush(stdout);
+    assert(strcmp(to_string_pointer(&state.tokens, query(&state, 4, "/foo")), "\"bar\"") == 0);
+    puts(to_string_pointer(&state.tokens, query(&state, 4, "/array/2")));
+    assert(strcmp(to_string_pointer(&state.tokens, query(&state, 8, "/array/2")), "4") == 0);
+    puts(to_string_pointer(&state.tokens, query(&state, 4, "/")));
+    assert(strcmp(to_string_pointer(&state.tokens, query(&state, 8, "/")), "null") == 0);
 
 #ifndef HAS_VLA
     printf("Total parsing time: %lld\n", total_parse_time);
