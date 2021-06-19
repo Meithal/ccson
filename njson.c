@@ -113,17 +113,17 @@ start_state(
     state->copies.string_pool = pool;
 }
 
-static int
-assoc_value(struct cisson_state * state, int token_idx) {
-    int i;
-    if (state->tokens.tokens_stack[token_idx].kind != STRING) {
-        return -1;
+static int next_child(struct cisson_state * state, int root_idx, int current_idx) {
+    int start = (root_idx + 1) % state->tokens.token_cursor;
+    if (current_idx >= 0) {
+        start = (current_idx + 1) % state->tokens.token_cursor;
     }
+    int i;
     for(
-            i = (token_idx + 1) % state->tokens.token_cursor;
-            i != token_idx;
+            i = start;
+            i != root_idx;
             i++, i%=state->tokens.token_cursor) {
-        if (state->tokens.tokens_stack[i].root_index == token_idx) {
+        if (state->tokens.tokens_stack[i].root_index == root_idx) {
             return i;
         }
     }
@@ -145,24 +145,38 @@ query(struct cisson_state * state, size_t length, char query[va_(length)]) {
             while (i + token_length < length && query[i + token_length] != '/') {
                 token_length++;
             }
-            char buffer[0x80] = { '"' };
-            cs_memcpy(&buffer[1], &query[i], token_length);
-            buffer[1 + token_length] = '"';
+            unsigned char buffer[0x80] = { '"' * (state->tokens.tokens_stack[token_index].kind == OBJECT) };
+            cs_memcpy(&buffer[1 * (state->tokens.tokens_stack[token_index].kind == OBJECT)], &query[i], token_length);
+            buffer[1 + token_length] = '"' * (state->tokens.tokens_stack[token_index].kind == OBJECT);
 
-            struct token * token;
-            for (token = &state->tokens.tokens_stack[1]; token < &state->tokens.tokens_stack[state->tokens.token_cursor]; token++) {
-                if (token_index == token->root_index) {
-                    if (state->tokens.tokens_stack[token_index].kind == OBJECT) {
-                        if(cs_memcmp(token->address + 1, buffer, token_length) == 0) {
-                            return assoc_value(state, token - &state->tokens.tokens_stack[0]);
-                        }
-                    } else if (state->tokens.tokens_stack[token_index].kind == ARRAY) {
-                        // todo
-                    }
+            if (state->tokens.tokens_stack[token_index].kind == ARRAY) {
+                int index = 0;
+                int j;
+                for (j = 0; buffer[j]; j++) {
+                    index *= 10;
+                    index += buffer[j] - '0';
                 }
+                int cur = -1;
+                do {
+                    cur = next_child(state, token_index, cur);
+                } while (index--);
+                token_index = cur;
+            } else if (state->tokens.tokens_stack[token_index].kind == OBJECT) {
+                int index = state->tokens.token_cursor;
+                int cur = -1;
+                do {
+                    cur = next_child(state, token_index, cur);
+                    if (cs_memcmp(state->tokens.tokens_stack[cur].address + 1,
+                                  buffer,
+                                  token_length + 2) == 0) {
+                        token_index = next_child(state,
+                                                 cur,
+                                                 -1);
+                        break;
+                    }
+                } while (index--);
             }
-
-            i = i + token_length;
+            i = i + token_length - 1;
         }
         i++;
     }
@@ -707,6 +721,10 @@ to_string_(struct tokens * res tokens, int start, int compact) {
         cs_memcpy(dest, (char*)stack[j].address + 1, *((char *) stack[j].address));
         cursor += cat(output + cursor, dest, &stack[j]);
 
+        if(stack[j+1].root_index < stack[start].root_index) {
+            break;
+        }
+
         if (stack[stack[j].root_index].kind == OBJECT) {
             cursor += cat_raw(output + cursor, compact ? ":" : ": ");
         }
@@ -715,6 +733,7 @@ to_string_(struct tokens * res tokens, int start, int compact) {
             cursor += cat_raw(output + cursor, compact ? "" : "\n");
             ident++;
         }
+
         if (j <= max) {
             if (stack[j + 1].root_index < stack[j].root_index) {
                 if (j + 1 == max
@@ -741,10 +760,6 @@ to_string_(struct tokens * res tokens, int start, int compact) {
                         }
                     }
                 }
-            }
-
-            if(stack[j+1].root_index < stack[start].root_index) {
-                break;
             }
 
             if (j + 1 < max && (

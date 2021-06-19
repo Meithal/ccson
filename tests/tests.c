@@ -494,10 +494,13 @@ int main(int argc, char** argv) {
     puts(to_string_pointer(&state.tokens, query(&state, 4, "/foo")));
     fflush(stdout);
     assert(strcmp(to_string_pointer(&state.tokens, query(&state, 4, "/foo")), "\"bar\"") == 0);
-    puts(to_string_pointer(&state.tokens, query(&state, 4, "/array/2")));
+    puts(to_string_pointer(&state.tokens, query(&state, 8, "/array/2")));
+    fflush(stdout);
     assert(strcmp(to_string_pointer(&state.tokens, query(&state, 8, "/array/2")), "4") == 0);
-    puts(to_string_pointer(&state.tokens, query(&state, 4, "/")));
-    assert(strcmp(to_string_pointer(&state.tokens, query(&state, 8, "/")), "null") == 0);
+    puts(to_string_pointer(&state.tokens, query(&state, 1, "/")));
+    assert(strcmp(to_string_pointer(&state.tokens, query(&state, 1, "/")), "null") == 0);
+    puts(to_string_pointer(&state.tokens, query(&state, 0, "")));
+    assert(strcmp(to_string_pointer(&state.tokens, query(&state, 0, "")), "{\"foo\":\"bar\",\"array\":[1,2,4],\"question\":true,\"\":null}") == 0);
 
 #ifndef HAS_VLA
     printf("Total parsing time: %lld\n", total_parse_time);

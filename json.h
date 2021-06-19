@@ -73,11 +73,30 @@ EXPORT int cisson_memcmp(const void *vl, const void *vr, size_t n)
 }
 #define cs_memcmp(v1, v2, size) (cisson_memcmp((v1), (v2), (size)))
 
+void *cisson_memmove(void *dest, const void *src, size_t n)
+{
+	char *d = dest;
+	const char *s = src;
+
+	if (d==s) return d;
+	if ((uintptr_t)s-(uintptr_t)d-n <= -2*n) return cisson_memcpy(d, s, n);
+
+	if (d<s) {
+		for (; n; n--) *d++ = *s++;
+	} else {
+		while (n) n--, d[n] = s[n];
+	}
+
+	return dest;
+}
+#define cs_memmove(dest, src, size) (cisson_memmove((dest), (src), (size)))
+
 #else
 #define cs_strlen(s) (strlen((s)))
 #define cs_memset(dest, val, repeat) (memset((dest), (val), (repeat)))
 #define cs_memcpy(dest, val, repeat) (memcpy((dest), (val), (repeat)))
 #define cs_memcmp(v1, v2, size) (memcmp((v1), (v2), (size)))
+#define cs_memmove(dest, src, size) (memmove((dest), (src), (size)))
 
 #endif  /* WANT_LIBC */
 

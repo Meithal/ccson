@@ -16,13 +16,6 @@ If used as a single-header file, add
 on top of your file.
 
 To use cisson as a library, CMake must be installed.
-`sjson` is the static library target, 
-`xjson` is the dynamic library target.
-`target_link_libraries()` can link any of them to 
-a cmake target.
-
-To bake cisson, `json.h` and `njson.c` must be listed in the 
-`add_executable` or `add_library` command.
 
 This example shows how to use it as a static library.
 ```bash
@@ -87,7 +80,7 @@ int main(void) {
     puts(to_string(&cisson_state.tokens)); /* {"foo":"bar","array":[1,2,4],"question":true} */
 }
 ```
-Closing tokens are not necessary if we have
+Closing tokens are not necessary when we have
 no more tokens to push. More and
 up-to-date examples are in tests/tests.c.
 
@@ -128,7 +121,8 @@ int main() {
 
 }
 ```
-The `>` symbol behaves as a root closer.
+The `>` symbol closes a root and replaces `CLOSE_ROOT`.
+`PUSH_ROOT` is called on the following tokens: `{`, `[`, `:`.
 
 `push_token` will use more computer cycles than the previous 
 method, so, if more convenient, it may be slower.
