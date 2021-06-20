@@ -8,29 +8,22 @@ but not required if you use the single-header version of it.
 No dependency, including LibC.
 
 ## Install
-If used as a single-header file, add
+Used single-header
 ```c
 #define CISSON_IMPLEMENTATION
 #include "cisson.h"
 ```
-on top of your file.
-
-To use cisson as a library, CMake must be installed.
-
-This example shows how to use it as a static library.
-```bash
-git clone https://gitlab.com/Meithal/cisson.git
-
-echo -e "add_subdirectory(cisson)\n"\
-"add_executable(my_exe my_source.c)\n"\ # this is your project
-"target_link_libraries(sjson my_exe)" > CmakeLists.txt
-
-mkdir build
-cd build
-cmake ..
-cmake --build . --config Release
-./Release/my_exe[.exe]
+`cisson.h` is the only file you have to compile. 
+***
+Used as a static library, through Cmake:
+```cmake
+add_subdirectory(cisson)
+add_executable(my_exe my_source.c my_header.h ...) # those are your project files
+target_link_libraries(sjson my_exe) # sjson is the static lib target, xjson is the dyn lib one
 ```
+You don't have to define `CISSON_IMPLEMENTATION` in this case 
+before including `cisson.h`,
+the implementation will be provided by the library.
 
 ## Usage
 Having a C object like this
@@ -42,56 +35,69 @@ struct foo = {
 };
 ```
 we can turn it into JSON text like that
+
 ```c
 #define CISSON_IMPLEMENTATION
 #include "cisson.h"
+#include <stdio.h> 
 
 int main(void) {
-    struct cisson_state cisson_state = {0};
+    struct foo = {
+        .foo = "bar",
+        .array = {1, 2, 3},
+        .question = true
+    };
+    
+    char vals[3][10] = { 0 };
+    sprintf(vals[0], "%d", foo.array[0]);
+    sprintf(vals[1], "%d", foo.array[1]);
+    sprintf(vals[2], "%d", foo.array[2]);
+    
+    struct cisson_state state = {0};
     
     start_state(&state, static_stack, sizeof static_stack,
-    static_pool, sizeof static_pool);
+        static_pool, sizeof static_pool);
     
-    START_AND_PUSH_TOKEN(&cisson_state, ROOT, "#custom root");
-    /* every token we push will be bound to the current root */
-    START_AND_PUSH_TOKEN(&cisson_state, OBJECT, "{");
-    PUSH_ROOT(&cisson_state);
-    /* "PUSH_ROOT" will change the current root to the previously
-     * pushed token so every following
-     * token will be bound to the object token */
-    START_AND_PUSH_TOKEN(&cisson_state, STRING, "\"foo\"");
-    PUSH_ROOT(&cisson_state);
-    /* next token will be bound to the key */
-    START_AND_PUSH_TOKEN(&cisson_state, STRING, "\"bar\"");
-    CLOSE_ROOT(&cisson_state);
-    /* now the root is no more the key but the object */
-    START_AND_PUSH_TOKEN(&cisson_state, STRING, "\"array\"");
-    PUSH_ROOT(&cisson_state);
-    START_AND_PUSH_TOKEN(&cisson_state, ARRAY, "[");
-    PUSH_ROOT(&cisson_state);
-    START_AND_PUSH_TOKEN(&cisson_state, NUMBER, "1");
-    START_AND_PUSH_TOKEN(&cisson_state, NUMBER, "2");
-    START_AND_PUSH_TOKEN(&cisson_state, NUMBER, "3");
-    CLOSE_ROOT(&cisson_state); /* the array */
-    CLOSE_ROOT(&cisson_state); /* the object property */
-    START_AND_PUSH_TOKEN(&cisson_state, STRING, "\"question\"");
-    PUSH_ROOT(&cisson_state);
-    START_AND_PUSH_TOKEN(&cisson_state, TRUE, "true");
-    puts(to_string(&cisson_state.tokens)); /* {"foo":"bar","array":[1,2,4],"question":true} */
+    START_AND_PUSH_TOKEN(&state, ROOT, "#custom root");
+    PUSH_ROOT(&state);
+    START_AND_PUSH_TOKEN(&state, OBJECT, "{");
+    PUSH_ROOT(&state);
+    START_AND_PUSH_TOKEN(&state, STRING, "\"foo\"");
+    PUSH_ROOT(&state);
+    START_AND_PUSH_TOKEN(&state, STRING, foo.foo);
+    CLOSE_ROOT(&state);
+    START_AND_PUSH_TOKEN(&state, STRING, "\"array\"");
+    PUSH_ROOT(&state);
+    START_AND_PUSH_TOKEN(&state, ARRAY, "[");
+    PUSH_ROOT(&state);
+    START_AND_PUSH_TOKEN(&state, NUMBER, vals[0]);
+    START_AND_PUSH_TOKEN(&state, NUMBER, vals[1]);
+    START_AND_PUSH_TOKEN(&state, NUMBER, vals[2]);
+    CLOSE_ROOT(&state);
+    CLOSE_ROOT(&state);
+    START_AND_PUSH_TOKEN(&state, STRING, "\"question\"");
+    PUSH_ROOT(&state);
+    START_AND_PUSH_TOKEN(&state, foo.question ? TRUE : FALSE, foo.question ? "true" : "false");
+    puts(to_string(&state.tokens)); /* {"foo":"bar","array":[1,2,4],"question":true} */
 }
 ```
-Closing tokens are not necessary when we have
-no more tokens to push. More and
-up-to-date examples are in tests/tests.c.
+Every token shall be bound to a root. The state keeps
+in memory what the current root is, to allow the resuming of
+the building of the JSON at any time. Array elements have as root
+their array, object properties have as root their object, and
+the values associated to properties have as root that 
+property. When we call `PUSH_ROOT`, we change the root
+the next tokens will have their root as. When calling
+`CLOSE_ROOT`, the current root will become what the root of the 
+current root was, hence going back in the
+hierarchy of roots by one notch.
 
-The nature of the JSON token we push onto the stack
-can be deduced from its first character. For example `[` signals an object,
-`"` signals a string, and so on.
-The `push_token` function can guess the nature
-of the json token we want to add, without having to 
-provide its nature explicitly. We can rewrite the previous
-example like that
+Cisson only accepts string values, you must convert your non-string
+values before they can be tokenized, by using `sprintf` for example.
 
+`to_string` outputs a cisson object as raw JSON.
+
+With `push_token`, we can rewrite the previous code like this
 ```c
 #include "json.h"
 
@@ -122,12 +128,11 @@ int main() {
 }
 ```
 The `>` symbol closes a root and replaces `CLOSE_ROOT`.
-`PUSH_ROOT` is called on the following tokens: `{`, `[`, `:`.
+`PUSH_ROOT` is called on the following tokens: `{`, `[`, `:`, `#`.
+We don't have to provide the nature of the token we want to push,
+as it can be guessed by the first character of the string.
 
-`push_token` will use more computer cycles than the previous 
-method, so, if more convenient, it may be slower.
-
-`stream_tokens` can be used to compress the previous code even further.
+`stream_tokens_` can be used to compress the previous code even further.
 
 ```c
 #include "json.h"
@@ -139,12 +144,70 @@ int main() {
                 static_pool, sizeof static_pool);
 
     stream_tokens(&state, '~',
-        &(char[]){"#smart root~{~\"foo\"~:~\"bar\"~>~\"array\"~:~[~1~2~4~>>~\"question\"~:~true"}, 68);
+        &(char[]){"#smart root~{~\"foo\"~:~\"bar\"~>~\"array\"~:~[~1~2~4~>>~\"question\"~:~true"});
     puts(to_string_compact(&state.tokens)); /* {"foo":"bar","array":[1,2,4],"question":true} */
 
 }
 ```
 
-We provide a separator character to use, a stream of
-tokens separated by the separator, and the total length 
-of the stream. The stream must be writeable.
+We provide a separator character to use, and a stream of
+tokens separated by the separator. The stream must be writeable.
+
+You can mix `stream_tokens_`, `push_tokens` and macros to
+build a JSON object.
+
+***
+
+To convert the JSON `{"foo":"bar","array":[1,2,4],"question":true}`
+into a C object, we can do
+
+```c
+#define CISSON_IMPLEMENTATION
+#include "cisson.h"
+#include <stdio.h> 
+#include <string.h> 
+
+int main(void) {
+    struct foo {
+        char * foo;
+        int array[3];
+        bool question;
+    };
+    
+    struct foo foo = { 0 };
+    
+    char * json = "{\"foo\":\"bar\",\"array\":[1,2,4],\"question\":true}"
+            
+    struct cisson_state state;
+    struct token stack[0x200];
+    char pool[0x200];
+    start_state(&state, stack, sizeof stack,
+        pool, sizeof pool);
+
+    enum json_errors error = rjson(strlen(json), json, &state);
+    
+    if (error != JSON_ERROR_NO_ERRORS) {
+        puts(json_errors[error]);
+        return 1;
+    }
+    
+    foo.foo = query(&state, "/foo").address;
+    sscanf(query(&state, "/array/0").address, "%d", &foo.array[0]);
+    sscanf(query(&state, "/array/1").address, "%d", &foo.array[1]);
+    sscanf(query(&state, "/array/2").address, "%d", &foo.array[2]);
+    foo.question = query(&state, "/array/2").kind == TRUE ? true: false;
+    
+    assert(memcmp((struct foo){.foo = foo.foo, .array={1, 2, 4}, .question=true}, foo, sizeof foo) == 0);
+}
+```
+
+`rjson` reads raw JSON and converts it to a cson object.
+
+`query` uses a JSON pointer (RFC 6901) to fetch a token from 
+the JSON tree. A token has an `.address` property that 
+points to the string associated with the token. It also
+has a `.kind` property.
+
+We used our own pool of memory instead of using the 
+shared static one, since our object will point to it, and we don't
+want to lose the value.

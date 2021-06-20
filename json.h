@@ -228,13 +228,13 @@ struct cisson_state {
     enum states cur_state;
     int root_index;
     struct tokens {
-        struct token *tokens_stack;
-        int token_cursor;
+        struct token *stack;
+        int max;
     } tokens;
-    struct copies {
-        unsigned char *string_pool;
-        unsigned int string_cursor;
-    } copies;
+    struct strings {
+        unsigned char *pool;
+        unsigned int cursor;
+    } strings;
 #ifdef WANT_JSON1
     enum json_mode mode;
 #endif
@@ -248,6 +248,10 @@ enum POINTER_ERRORS {
 /* State maintenance */
 EXPORT void
 start_state(struct cisson_state * state, struct token *stack, size_t stack_size, unsigned char *pool, size_t pool_size);
+#define cs_tokens(state, index) (state)->tokens.token_stack[(index)]
+EXPORT struct token *
+query_(struct cisson_state * state, size_t length, char query[va_(length)]);
+#define query(state, string) query_((state), cs_strlen(string), (string))
 
 /* Parsing */
 EXPORT enum json_errors rjson(
@@ -260,11 +264,11 @@ EXPORT char* print_debug(struct tokens * );
 #else
 #define print_debug(_) ""
 #endif
-EXPORT int
-query(struct cisson_state * state, size_t length, char query[va_(length)]);
-EXPORT unsigned char * res to_string_(struct tokens * res tokens, int start, int compact);
-#define to_string(tokens_) (char * res)to_string_(tokens_, 0, 0)
-#define to_string_compact(tokens_) (char * res)to_string_(tokens_, 0, 1)
+
+EXPORT unsigned char * res
+to_string_(struct tokens * res tokens, struct token * start, int compact);
+#define to_string(tokens_) (char * res)to_string_(tokens_, NULL, 0)
+#define to_string_compact(tokens_) (char * res)to_string_(tokens_, NULL, 1)
 #define to_string_pointer(tokens_, pointer_) (char * res)to_string_(tokens_, pointer_, 1)
 /* Building */
 EXPORT void start_string(unsigned int *, const unsigned char [STRING_POOL_SIZE]);
@@ -275,30 +279,44 @@ EXPORT void push_token_kind(enum kind kind, void *res address
                             , struct tokens *tokens, int root_index);
 /* EZ JSON */
 EXPORT void
-push_token(struct cisson_state * state, char token[va_(static 1)]);
+insert_token(struct cisson_state * state, char *token, struct token* root);
+#define push_token(state, token) insert_token((state), (token), &(state)->tokens.stack[(state)->root_index])
 EXPORT void
-stream_tokens(struct cisson_state * state, char separator, char stream[va_(static 0)], size_t length);
-#define START_STRING(state_) start_string(&(state_)->copies.string_cursor, (state_)->copies.string_pool)
+stream_tokens_(struct cisson_state * state, char separator, char *stream, size_t length);
+#define stream_tokens(state, sep, stream) stream_tokens_((state), (sep), (stream), cs_strlen(stream));
+#define START_STRING(state_) start_string(&(state_)->strings.cursor, (state_)->strings.pool)
 #define PUSH_STRING(state_, string_, length_) \
     push_string(                               \
-        &(state_)->copies.string_cursor,             \
-        (state_)->copies.string_pool,                \
+        &(state_)->strings.cursor,             \
+        (state_)->strings.pool,                \
         (string_),                             \
         (length_))
-#define CLOSE_ROOT(state_) close_root((*(state_)).tokens.tokens_stack, &(*(state_)).root_index)
-#define PUSH_ROOT(state_) push_root(&(state_)->root_index, &(state_)->tokens.token_cursor)
+#define CLOSE_ROOT(state_) close_root((*(state_)).tokens.stack, &(*(state_)).root_index)
+#define PUSH_ROOT(state_) push_root(&(state_)->root_index, &(state_)->tokens.max)
 #define PUSH_TOKEN(kind_, address_, state_) \
     push_token_kind(                             \
         (kind_),                            \
         (address_),                         \
         &(state_)->tokens,                  \
         (state_)->root_index)
+#define INSERT_TOKEN(kind_, address_, state_, root) \
+    push_token_kind(                        \
+        (kind_),                            \
+        (address_),                         \
+        &(state_)->tokens,                  \
+        (root))
 #define PUSH_STRING_TOKEN(kind_, state_) \
-    PUSH_TOKEN((kind_), (state_)->copies.string_pool + (state_)->copies.string_cursor, (state_))
+    PUSH_TOKEN((kind_), (state_)->strings.pool + (state_)->strings.cursor, (state_))
+#define INSERT_STRING_TOKEN(kind_, state_, root) \
+    INSERT_TOKEN((kind_), (state_)->strings.pool + (state_)->strings.cursor, (state_), (root))
 #define START_AND_PUSH_TOKEN(state, kind, string) \
     START_STRING(state);               \
     PUSH_STRING((state), string, (cs_strlen (string))); \
     PUSH_STRING_TOKEN(kind, state)
+#define START_AND_INSERT_TOKEN(state, kind, string, root) \
+    START_STRING(state);               \
+    PUSH_STRING((state), (string), (cs_strlen (string))); \
+    INSERT_STRING_TOKEN((kind), (state), (root))
 /* __/ */
 
 

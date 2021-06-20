@@ -202,13 +202,13 @@ struct cisson_state {
     enum states cur_state;
     int root_index;
     struct tokens {
-        struct token *tokens_stack;
-        int token_cursor;
+        struct token *stack;
+        int max;
     } tokens;
-    struct copies {
-        unsigned char *string_pool;
-        unsigned int string_cursor;
-    } copies;
+    struct strings {
+        unsigned char *pool;
+        unsigned int cursor;
+    } strings;
 #ifdef WANT_JSON1
     enum json_mode mode;
 #endif
@@ -246,18 +246,18 @@ EXPORT void push_token_kind(enum kind kind, void *res address
                             , struct tokens *tokens, int root_index);
 /* EZ JSON */
 EXPORT void
-push_token(struct cisson_state * state, char token[va_(static 1)]);
+insert_token(struct cisson_state * state, char *token);
 EXPORT void
-stream_tokens(struct cisson_state * state, char separator, char stream[va_(static 0)], size_t length);
-#define START_STRING(state_) start_string(&(state_)->copies.string_cursor, (state_)->copies.string_pool)
+stream_tokens_(struct cisson_state * state, char separator, char *stream, size_t length);
+#define START_STRING(state_) start_string(&(state_)->strings.cursor, (state_)->strings.pool)
 #define PUSH_STRING(state_, string_, length_) \
     push_string(                               \
-        &(state_)->copies.string_cursor,             \
-        (state_)->copies.string_pool,                \
+        &(state_)->strings.cursor,             \
+        (state_)->strings.pool,                \
         (string_),                             \
         (length_))
-#define CLOSE_ROOT(state_) close_root((*(state_)).tokens.tokens_stack, &(*(state_)).root_index)
-#define PUSH_ROOT(state_) push_root(&(state_)->root_index, &(state_)->tokens.token_cursor)
+#define CLOSE_ROOT(state_) close_root((*(state_)).tokens.stack, &(*(state_)).root_index)
+#define PUSH_ROOT(state_) push_root(&(state_)->root_index, &(state_)->tokens.max)
 #define PUSH_TOKEN(kind_, address_, state_) \
     push_token_kind(                             \
         (kind_),                            \
@@ -265,7 +265,7 @@ stream_tokens(struct cisson_state * state, char separator, char stream[va_(stati
         &(state_)->tokens,                  \
         (state_)->root_index)
 #define PUSH_STRING_TOKEN(kind_, state_) \
-    PUSH_TOKEN((kind_), (state_)->copies.string_pool + (state_)->copies.string_cursor, (state_))
+    PUSH_TOKEN((kind_), (state_)->strings.pool + (state_)->strings.cursor, (state_))
 #define START_AND_PUSH_TOKEN(state, kind, string) \
     START_STRING(state);               \
     PUSH_STRING((state), string, (cs_strlen (string))); \
@@ -337,13 +337,13 @@ push_token_kind(
         void * address,
         struct tokens *tokens,
         int root_index) {
-    tokens->tokens_stack[(tokens->token_cursor)++] = (struct token) {
+    tokens->stack[(tokens->max)++] = (struct token) {
         .kind=kind, .root_index=root_index, .address=address
     };
 }
 
 EXPORT void
-push_token(struct cisson_state * state, char token[va_(static 1)]) {
+insert_token(struct cisson_state * state, char *token) {
     if(token[0] == '>') {
         int i = 0;
         while (token[i] && token[i] == '>') {
@@ -364,7 +364,7 @@ push_token(struct cisson_state * state, char token[va_(static 1)]) {
 }
 
 EXPORT void
-stream_tokens(struct cisson_state * state, char separator, char stream[va_(static 0)], size_t length) {
+stream_tokens_(struct cisson_state * state, char separator, char *stream, size_t length) {
     size_t i = 0;
     while (i < length) {
         size_t token_length = 0;
@@ -372,7 +372,7 @@ stream_tokens(struct cisson_state * state, char separator, char stream[va_(stati
             token_length++;
         }
         stream[i + token_length] = '\0';
-        push_token(state, &stream[i]);
+        insert_token(state, &stream[i]);
         i = i + token_length + sizeof separator;
     }
 }
@@ -387,8 +387,8 @@ start_state(
     memset(state, 0, sizeof (struct cisson_state));
     memset(stack, 0, stack_size);
     memset(pool, 0, pool_size);
-    state->tokens.tokens_stack = stack;
-    state->copies.string_pool = pool;
+    state->tokens.stack = stack;
+    state->strings.pool = pool;
 }
 
 EXPORT int
@@ -420,11 +420,11 @@ rjson(size_t len,
     if(external_state != NULL) {
         state = external_state;
     }
-    if (state->tokens.tokens_stack == NULL) {
+    if (state->tokens.stack == NULL) {
         memset(static_stack, 0, sizeof(static_stack));
         memset(static_pool, 0, sizeof(static_pool));
-        state->tokens.tokens_stack = static_stack;
-        state->copies.string_pool = static_pool;
+        state->tokens.stack = static_stack;
+        state->strings.pool = static_pool;
     }
 
     enum json_errors error = JSON_ERROR_NO_ERRORS;
@@ -515,7 +515,7 @@ rjson(size_t len,
                             len_whitespace(cursor)+sizeof("null") - 1
                             );
                 }
-                else if (state->tokens.tokens_stack[state->root_index].kind != ROOT) {
+                else if (state->tokens.stack[state->root_index].kind != ROOT) {
                     error = JSON_ERROR_ASSOC_EXPECT_VALUE;
                 }
                 else if (remaining(final, cursor)) {
@@ -529,21 +529,21 @@ rjson(size_t len,
             }
             case AFTER_VALUE:
             {
-                if (state->tokens.tokens_stack[state->root_index].kind == ROOT) {
+                if (state->tokens.stack[state->root_index].kind == ROOT) {
                     if (remaining(final, cursor + len_whitespace(cursor))) {
                         error = JSON_ERROR_NO_SIBLINGS;
 #ifdef WANT_JSON1
-                    } else if(state->mode == JSON1 && tokens[state->token_cursor-1].kind != OBJECT) {
+                    } else if(state->mode == JSON1 && tokens[state->max-1].kind != OBJECT) {
                         state->error = JSON_ERROR_JSON1_ONLY_ASSOC_ROOT;
 #endif
                     } else {
                         goto exit;
                     }
                 }
-                else if(state->tokens.tokens_stack[state->root_index].kind == ARRAY) {
+                else if(state->tokens.stack[state->root_index].kind == ARRAY) {
                     SET_STATE_AND_ADVANCE_BY(ARRAY_AFTER_VALUE, 0);
                 }
-                else if(state->tokens.tokens_stack[state->root_index].kind == STRING) {
+                else if(state->tokens.stack[state->root_index].kind == STRING) {
                     SET_STATE_AND_ADVANCE_BY(ASSOC_AFTER_INNER_VALUE, 0);
                 }
 
@@ -780,7 +780,7 @@ rjson(size_t len,
 
             case CLOSE_STRING: {  /* fixme: non advancing state */
                 PUSH_STRING_TOKEN(STRING, state);
-                if ((state->tokens.tokens_stack)[state->root_index].kind == OBJECT) {
+                if ((state->tokens.stack)[state->root_index].kind == OBJECT) {
                     PUSH_ROOT(state);
                     SET_STATE_AND_ADVANCE_BY(ASSOC_EXPECT_COLON, 0);
                 } else {
@@ -831,10 +831,10 @@ static char output[STRING_POOL_SIZE];
 EXPORT char* print_debug(struct tokens * tokens) {
     int j;
     int cursor = 0;
-    struct token *stack = tokens->tokens_stack;
+    struct token *stack = tokens->stack;
 
     memset(output, 0, sizeof(output));
-    for (j = 0; j < tokens->token_cursor; ++j) {
+    for (j = 0; j < tokens->max; ++j) {
         char dest[STRING_POOL_SIZE] = {0};
 
         cursor += snprintf(
@@ -914,8 +914,8 @@ EXPORT size_t minified_string(unsigned char * target, const unsigned char * sour
 EXPORT unsigned char * res
 to_string_(struct tokens * res tokens, int compact) {
     // todo: make the caller handle the buffer
-    struct token *stack = tokens->tokens_stack;
-    int max = tokens->token_cursor;
+    struct token *stack = tokens->stack;
+    int max = tokens->max;
 
 #define cat(where, string, token) (\
     minified_string((where), (string), *((char*)(token)->address)\

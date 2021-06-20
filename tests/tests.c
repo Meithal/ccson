@@ -411,7 +411,7 @@ int main(int argc, char** argv) {
         int res = rjson((unsigned char*)bogus_json1[i], strlen(bogus_json1[i]) - 1, &cisson_state);
         printf("For >>> %s <<<, \n -> %s\n", bogus_json1[i], json_errors[cisson_state.error]);
         puts(print_debug(&cisson_state));
-        puts(to_string(*(cisson_state.tokens_stack), res));
+        puts(to_string(*(cisson_state.stack), res));
         fflush(stdout);
         assert(cisson_state.error == JSON_ERROR_JSON1_ONLY_ASSOC_ROOT);
     }
@@ -424,6 +424,7 @@ int main(int argc, char** argv) {
                 static_pool, sizeof static_pool);
 
     START_AND_PUSH_TOKEN(&state, ROOT, "#custom root");
+    PUSH_ROOT(&state);
     START_AND_PUSH_TOKEN(&state, ARRAY, "[");
     PUSH_ROOT(&state);
     START_AND_PUSH_TOKEN(&state, NUMBER, "1");
@@ -478,29 +479,51 @@ int main(int argc, char** argv) {
     push_token(&state, "true");
     puts(to_string(&state.tokens));
     puts(to_string_compact(&state.tokens));
+
     assert(strcmp(to_string_compact(&state.tokens),"{\"foo\":\"bar\",\"array\":[1,2,4],\"question\":true}") == 0);
 
     puts("\n\n*** STREAM EX NIHILO ***");
+
     start_state(&state, static_stack, sizeof static_stack,
                 static_pool, sizeof static_pool);
     stream_tokens(&state, '~',
-                  (char*)&(char[]){"#stream root~{~\"foo\"~:~\"bar\"~>~\"array\"~:~[~1~2~4~>>~\"question\"~:~true~>~\"\"~:~null"}, 81 /* stream length */);
+                   (char *) &(char[]) {
+                           "#stream root~{~\"foo\"~:~\"bar\"~>~\"array\"~:~[~1~2~4~>>~\"question\"~:~true~>~\"\"~:~null"}
+                   );
     puts(to_string(&state.tokens));
     puts(to_string_compact(&state.tokens));
-    fflush(stdout);
     assert(strcmp(to_string_compact(&state.tokens),"{\"foo\":\"bar\",\"array\":[1,2,4],\"question\":true,\"\":null}") == 0);
-
+    fflush(stdout);
     puts("\n\n*** POINTERS ***");
-    puts(to_string_pointer(&state.tokens, query(&state, 4, "/foo")));
+
+    puts(to_string_pointer(&state.tokens, query(&state, "/foo")));
+    assert(strcmp(to_string_pointer(&state.tokens, query(&state, "/foo")), "\"bar\"") == 0);
+
+    puts(to_string_pointer(&state.tokens, query(&state, "/array/2")));
+    assert(strcmp(to_string_pointer(&state.tokens, query(&state, "/array/2")), "4") == 0);
+
+    puts(to_string_pointer(&state.tokens, query(&state, "/")));
+    assert(strcmp(to_string_pointer(&state.tokens, query(&state, "/")), "null") == 0);
+
+    puts(to_string_pointer(&state.tokens, query(&state, "")));
+    assert(strcmp(to_string_pointer(&state.tokens, query(&state, "")), "{\"foo\":\"bar\",\"array\":[1,2,4],\"question\":true,\"\":null}") == 0);
     fflush(stdout);
-    assert(strcmp(to_string_pointer(&state.tokens, query(&state, 4, "/foo")), "\"bar\"") == 0);
-    puts(to_string_pointer(&state.tokens, query(&state, 8, "/array/2")));
+    puts("\n\n*** EDITION ***");
+
+    start_state(&state, static_stack, sizeof static_stack,
+                static_pool, sizeof static_pool);
+    rjson(19, (unsigned char*)"{\"mon\":[],\"tue\":[]}", &state);
+    struct token* mon = query(&state, "/mon");
+    struct token* tue = query(&state, "/tue");
+    char buf[4];
+    int j;
+    for (j = 0; j < 20; j++) {
+        sprintf(buf, "%d", j);
+        insert_token(&state, buf, j % 2 ? mon : tue);
+    }
+    puts(to_string_compact(&state.tokens));
     fflush(stdout);
-    assert(strcmp(to_string_pointer(&state.tokens, query(&state, 8, "/array/2")), "4") == 0);
-    puts(to_string_pointer(&state.tokens, query(&state, 1, "/")));
-    assert(strcmp(to_string_pointer(&state.tokens, query(&state, 1, "/")), "null") == 0);
-    puts(to_string_pointer(&state.tokens, query(&state, 0, "")));
-    assert(strcmp(to_string_pointer(&state.tokens, query(&state, 0, "")), "{\"foo\":\"bar\",\"array\":[1,2,4],\"question\":true,\"\":null}") == 0);
+
 
 #ifndef HAS_VLA
     printf("Total parsing time: %lld\n", total_parse_time);
