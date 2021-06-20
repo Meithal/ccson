@@ -2,7 +2,7 @@ Cisson is a JSON library in C. It serializes C objects
 into JSON and parses JSON into C objects.
 
 ## Requirements
-Tested with GCC and MSVC. Cmake is optional.
+Tested with GCC and MSVC.
 
 ## Install
 Used single-header
@@ -12,27 +12,21 @@ Used single-header
 ```
 The preprocessor will copy `cisson.h` in your file, and
 there is nothing more to do on your side.
-***
-Used as a static library, through Cmake:
-```cmake
-add_subdirectory(cisson)
-add_executable(my_exe my_source.c my_header.h ...) # those are your project files
-target_link_libraries(sjson my_exe) # sjson is the static lib target, xjson is the dyn lib one
-```
-In this case, you don't have to define `CISSON_IMPLEMENTATION` 
-before including `cisson.h`,
-the library already has the implementation.
 
 ## Usage
-Having a C object like this
-```c
-struct foo = {
-        .foo = "bar",
-        .array = {1, 2, 3},
-        .question = true
-};
-```
-we can turn it into JSON text like that
+`rjson()` reads JSON and turns it into a cisson object
+(a tree of tokens).
+
+`to_string()` turns a cisson tree object into JSON text.
+
+`push_token()`, `stream_tokens()` and `insert_token()` 
+let you build a cisson tree from scratch or manipulate
+one that already exists. 
+
+`query()` lets you target a specific token in the tree using
+the JSON pointer syntax.
+
+## Example
 
 ```c
 #define CISSON_IMPLEMENTATION
@@ -79,7 +73,7 @@ int main(void) {
     puts(to_string(&state.tokens)); /* {"foo":"bar","array":[1,2,4],"question":true} */
 }
 ```
-Every token has a root that they bind to. The state keeps
+Every token has a root that it binds to. The state keeps
 in memory what the current root is, for example if the current root
 is an array, every token we push will be a value of this array. 
 This allows to resume the building of the JSON tree at any time. 
@@ -209,11 +203,12 @@ int main(void) {
 
 `rjson` reads raw JSON and converts it to a cson object.
 
-`query` uses a JSON pointer (see [RFC 6901](https://datatracker.ietf.org/doc/html/rfc6901)) to fetch a token from 
-the JSON tree. A token has an `.address` property that 
-points to the string associated with the token. It also
-has a `.kind` property.
+`query` uses a JSON pointer 
+(see [RFC 6901](https://datatracker.ietf.org/doc/html/rfc6901)) 
+to fetch a token from the JSON tree. A token has an `.address` 
+property that points to the string associated with the token. 
+It also has a `.kind` property.
 
 We used our own pool of memory instead of using the 
-shared static one, since our object will point to it, and we don't
-want to lose the value.
+shared static one, since our object will point to it, 
+and we don't want to lose the value.

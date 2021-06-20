@@ -245,6 +245,7 @@ enum POINTER_ERRORS {
     POINTER_WRONG_SYNTAX = -1,
     POINTER_NOT_FOUND = -2
 };
+#define NO_CHILD (-2)
 
 /* State maintenance */
 EXPORT void

@@ -521,7 +521,7 @@ int main(int argc, char** argv) {
         sprintf(buf, "%d", j);
         insert_token(&state, buf, j % 2 ? mon : tue);
     }
-    puts(to_string_compact(&state.tokens));
+    //puts(to_string_compact(&state.tokens));
     fflush(stdout);
 
 

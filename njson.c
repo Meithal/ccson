@@ -116,21 +116,21 @@ start_state(
     state->root_index = -1;
 }
 
-static int next_child(struct cisson_state * state, int root_idx, int current_idx) {
-    int start = (root_idx + 1) % state->tokens.max;
+static int next_child(struct tokens *  tokens, int root_idx, int current_idx) {
+    int start = (root_idx + 1) % tokens->max;
     if (current_idx >= 0) {
-        start = (current_idx + 1) % state->tokens.max;
+        start = (current_idx + 1) % tokens->max;
     }
     int i;
     for(
             i = start;
             i != root_idx;
-            i++, i%=state->tokens.max) {
-        if (state->tokens.stack[i].root_index == root_idx) {
+            i++, i%=tokens->max) {
+        if (tokens->stack[i].root_index == root_idx) {
             return i;
         }
     }
-    return -1;
+    return NO_CHILD;
 }
 
 EXPORT struct token *
@@ -161,18 +161,18 @@ query_(struct cisson_state * state, size_t length, char query[va_(length)]) {
                 }
                 int cur = -1;
                 do {
-                    cur = next_child(state, token_index, cur);
+                    cur = next_child(&state->tokens, token_index, cur);
                 } while (index--);
                 token_index = cur;
             } else if (state->tokens.stack[token_index].kind == OBJECT) {
                 int index = state->tokens.max;
                 int cur = -1;
                 do {
-                    cur = next_child(state, token_index, cur);
+                    cur = next_child(&state->tokens, token_index, cur);
                     if (cs_memcmp(state->tokens.stack[cur].address + 1,
                                   buffer,
                                   token_length + 2) == 0) {
-                        token_index = next_child(state,
+                        token_index = next_child(&state->tokens,
                                                  cur,
                                                  -1);
                         break;
@@ -202,10 +202,12 @@ rjson(size_t len,
         state = external_state;
     }
     if (state->tokens.stack == NULL) {
-        memset(static_stack, 0, sizeof(static_stack));
-        memset(static_pool, 0, sizeof(static_pool));
-        state->tokens.stack = static_stack;
-        state->strings.pool = static_pool;
+        start_state(
+                state,
+                static_stack,
+                sizeof static_stack,
+                static_pool,
+                sizeof static_pool);
     }
 
     enum json_errors error = JSON_ERROR_NO_ERRORS;
@@ -713,8 +715,8 @@ to_string_(struct tokens * res tokens, struct token * start, int compact) {
     cs_memset(output, 0, sizeof output);
     size_t cursor = 0;
     int ident = 0;
-    ptrdiff_t j;
-    for (j = start - tokens->stack; j < max; ++j) {
+    int j;
+    for (j = (int)(start - tokens->stack); j < max; ++j) {
         struct token * tok = &tokens->stack[j];
 
         if(tok->kind == UNSET || tok->kind == ROOT) {
@@ -742,7 +744,7 @@ to_string_(struct tokens * res tokens, struct token * start, int compact) {
             ident++;
         }
 
-        if (stack[j + 1].root_index < tok->root_index) {
+        if (stack[j + 1].root_index < tok->root_index && next_child(tokens, tok->root_index, j) == NO_CHILD) {
             int target = stack[j + 1].root_index;
             ptrdiff_t cur_node = j;
             for (;;) {
