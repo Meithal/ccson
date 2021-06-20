@@ -33,6 +33,7 @@
 
 #ifndef NULL  /* No libC */
 #define size_t unsigned long long
+#define ptrdiff_t long long
 #define NULL ((void *)0)
 #endif
 

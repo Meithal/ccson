@@ -1,11 +1,8 @@
-Cisson is a JSON library in C. It can serialize C objects
-into JSON and parse JSON into C objects.
+Cisson is a JSON library in C. It serializes C objects
+into JSON and parses JSON into C objects.
 
 ## Requirements
-Tested on Windows and Linux, should compile with MSVC and GCC.
-Cmake is helpful to easily include this library in your project,
-but not required if you use the single-header version of it.
-No dependency, including LibC.
+Tested with GCC and MSVC. Cmake is optional.
 
 ## Install
 Used single-header
@@ -13,7 +10,8 @@ Used single-header
 #define CISSON_IMPLEMENTATION
 #include "cisson.h"
 ```
-`cisson.h` is the only file you have to compile. 
+The preprocessor will copy `cisson.h` in your file, and
+there is nothing more to do on your side.
 ***
 Used as a static library, through Cmake:
 ```cmake
@@ -21,9 +19,9 @@ add_subdirectory(cisson)
 add_executable(my_exe my_source.c my_header.h ...) # those are your project files
 target_link_libraries(sjson my_exe) # sjson is the static lib target, xjson is the dyn lib one
 ```
-You don't have to define `CISSON_IMPLEMENTATION` in this case 
+In this case, you don't have to define `CISSON_IMPLEMENTATION` 
 before including `cisson.h`,
-the implementation will be provided by the library.
+the library already has the implementation.
 
 ## Usage
 Having a C object like this
@@ -81,21 +79,25 @@ int main(void) {
     puts(to_string(&state.tokens)); /* {"foo":"bar","array":[1,2,4],"question":true} */
 }
 ```
-Every token shall be bound to a root. The state keeps
-in memory what the current root is, to allow the resuming of
-the building of the JSON at any time. Array elements have as root
-their array, object properties have as root their object, and
-the values associated to properties have as root that 
-property. When we call `PUSH_ROOT`, we change the root
+Every token has a root that they bind to. The state keeps
+in memory what the current root is, for example if the current root
+is an array, every token we push will be a value of this array. 
+This allows to resume the building of the JSON tree at any time. 
+
+Array elements have as root their array; 
+Object properties have as root their object; 
+The values associated to object properties have as root that 
+very property. When we call `PUSH_ROOT`, we change the root
 the next tokens will have their root as. When calling
 `CLOSE_ROOT`, the current root will become what the root of the 
 current root was, hence going back in the
 hierarchy of roots by one notch.
 
 Cisson only accepts string values, you must convert your non-string
-values before they can be tokenized, by using `sprintf` for example.
+values before they can be tokenized; by using `sprintf` for example.
 
-`to_string` outputs a cisson object as raw JSON.
+`to_string` converts your cisson object into a JSON string
+and returns a pointer to it.
 
 With `push_token`, we can rewrite the previous code like this
 ```c
@@ -106,6 +108,10 @@ int main() {
     
     start_state(&state, static_stack, sizeof static_stack,
                 static_pool, sizeof static_pool);
+    /* cisson has a static stack of tokens and a static pool
+     * of characters where the token contents will be copied to.
+     * You can use your own stack and pool if you plan to 
+     * have more than one cisson object in memory at any time. */
 
     push_token(&state, "#smart root"); /* only the leading # is necessary to signal a document root */
     push_token(&state, "{");
@@ -132,7 +138,7 @@ The `>` symbol closes a root and replaces `CLOSE_ROOT`.
 We don't have to provide the nature of the token we want to push,
 as it can be guessed by the first character of the string.
 
-`stream_tokens_` can be used to compress the previous code even further.
+`stream_tokens` can be used to compress the previous code even further.
 
 ```c
 #include "json.h"
@@ -153,13 +159,13 @@ int main() {
 We provide a separator character to use, and a stream of
 tokens separated by the separator. The stream must be writeable.
 
-You can mix `stream_tokens_`, `push_tokens` and macros to
+You can mix `stream_tokens`, `push_tokens` and macros to
 build a JSON object.
 
 ***
 
 To convert the JSON `{"foo":"bar","array":[1,2,4],"question":true}`
-into a C object, we can do
+into a C object,
 
 ```c
 #define CISSON_IMPLEMENTATION
@@ -203,7 +209,7 @@ int main(void) {
 
 `rjson` reads raw JSON and converts it to a cson object.
 
-`query` uses a JSON pointer (RFC 6901) to fetch a token from 
+`query` uses a JSON pointer (see [RFC 6901](https://datatracker.ietf.org/doc/html/rfc6901)) to fetch a token from 
 the JSON tree. A token has an `.address` property that 
 points to the string associated with the token. It also
 has a `.kind` property.

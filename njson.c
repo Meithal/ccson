@@ -218,8 +218,7 @@ rjson(size_t len,
     // todo: make ANSI/STDC compatible
     // todo: complete unicode support?
     // todo: add jasmine mode? aka not copy strings+numbers ?
-    // todo: pedantic mode? (forbid duplicate keys, enforce order...)
-    // fixme: tokenizer macro functions should be functions
+    // todo: pedantic mode? (forbid duplicate keys, enforce order, cap integer values to INT_MAX...)
     // todo: test for overflows
     // fixme: check for bounds
     // todo: example with slowly filled array
@@ -702,9 +701,11 @@ to_string_(struct tokens * res tokens, struct token * start, int compact) {
     }
 
 #define cat(where, string, token) (\
-    minified_string((where), (string), *((char*)(token)->address)\
-))
-#define cat_raw(where, string) (cs_memcpy((where), (string), cs_strlen((string))), cs_strlen((string)))
+    minified_string((where), (string), *((char*)(token)->address)) \
+)
+#define cat_raw(where, string) ( \
+    cs_memcpy((where), (string), cs_strlen((string))), cs_strlen((string)) \
+)
 
     typedef unsigned char u8;
 
@@ -712,14 +713,15 @@ to_string_(struct tokens * res tokens, struct token * start, int compact) {
     cs_memset(output, 0, sizeof output);
     size_t cursor = 0;
     int ident = 0;
-    int j;
+    ptrdiff_t j;
     for (j = start - tokens->stack; j < max; ++j) {
+        struct token * tok = &tokens->stack[j];
 
-        if(stack[j].kind == UNSET || stack[j].kind == ROOT) {
+        if(tok->kind == UNSET || tok->kind == ROOT) {
             continue;
         }
 
-        if (stack[stack[j].root_index].kind != STRING) {
+        if (stack[tok->root_index].kind != STRING) {
             cursor += cat_raw(output + cursor, print_ident(ident, compact));
         }
 
@@ -731,20 +733,19 @@ to_string_(struct tokens * res tokens, struct token * start, int compact) {
             break;
         }
 
-        if (stack[stack[j].root_index].kind == OBJECT) {
+        if (stack[tok->root_index].kind == OBJECT) {
             cursor += cat_raw(output + cursor, compact ? ":" : ": ");
         }
 
-        if(stack[j].kind == ARRAY || stack[j].kind == OBJECT) {
+        if(tok->kind == ARRAY || tok->kind == OBJECT) {
             cursor += cat_raw(output + cursor, compact ? "" : "\n");
             ident++;
         }
 
-        if (stack[j + 1].root_index < stack[j].root_index) {
+        if (stack[j + 1].root_index < tok->root_index) {
             int target = stack[j + 1].root_index;
-            int cur_node = j;
+            ptrdiff_t cur_node = j;
             for (;;) {
-
                 if(stack[stack[cur_node].root_index].kind == ARRAY) {
                     cursor += cat_raw(output + cursor, compact ? "" : "\n");
                     --ident;
@@ -764,8 +765,8 @@ to_string_(struct tokens * res tokens, struct token * start, int compact) {
         }
 
         if (j + 1 < max && (
-           stack[stack[j].root_index].kind == STRING || stack[stack[j].root_index].kind == ARRAY
-        ) && stack[j].kind != ARRAY && stack[j].kind != OBJECT) {
+           stack[tok->root_index].kind == STRING || stack[tok->root_index].kind == ARRAY
+        ) && tok->kind != ARRAY && tok->kind != OBJECT) {
             cursor += cat_raw(output + cursor, compact ? "," : ",\n");
         }
     }
