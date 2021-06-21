@@ -12,25 +12,10 @@ execute_process(
         ERROR_QUIET
         OUTPUT_STRIP_TRAILING_WHITESPACE
 )
-execute_process(
-        COMMAND "${GIT_EXECUTABLE}" rev-parse --short HEAD
-        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
-        OUTPUT_VARIABLE _var_LAST_COMMIT_HASH
-        ERROR_QUIET
-        OUTPUT_STRIP_TRAILING_WHITESPACE
-)
 if(_var_res)
     set(_var_LAST_COMMIT, "0")
-else()
-    # fixme: use that instead:
-    # https://cmake.org/cmake/help/latest/command/add_custom_command.html#build-events
-    set_property(GLOBAL APPEND
-            PROPERTY CMAKE_CONFIGURE_DEPENDS
-            "${CMAKE_SOURCE_DIR}/.git/index")
 endif()
-add_compile_definitions(LAST_COMMIT_COUNT="${_var_LAST_COMMIT}")
-add_compile_definitions(LAST_COMMIT_HASH="${_var_LAST_COMMIT_HASH}")
-add_compile_definitions(CMAKE_GENERATOR="$CACHE{CMAKE_C_COMPILER}")
+
 add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
 
 project(Cisson
@@ -74,7 +59,7 @@ endif()
 
 option(CISSON_WANT_SINGLE_HEADER_LIB "Generate a single header file by concatenating 2 files." OFF)
 if(CISSON_WANT_SINGLE_HEADER_LIB)
-    include(concat.cmake OPTIONAL)
+    add_custom_command(TARGET tests PRE_BUILD COMMAND cmake -P ${CMAKE_CURRENT_SOURCE_DIR}/concat.cmake VERBATIM)
 endif()
 
 option(CISSON_WANT_JSON1 "Add JSON 1 support." OFF)
@@ -96,6 +81,5 @@ option(CISSON_WANT_LIBC "Use LibC." ON)
 if(CISSON_WANT_LIBC)
     add_compile_definitions("WANT_LIBC")
 endif()
+
 set(CMAKE_C_STANDARD_LIBRARIES "")
-
-
