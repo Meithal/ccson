@@ -521,9 +521,13 @@ int main(int argc, char** argv) {
         sprintf(buf, "%d", j);
         insert_token(&state, buf, j % 2 ? mon : tue);
     }
-    puts((char *)to_stringn_(&state.tokens, &state.tokens.stack[1], 0, 0));
-    fflush(stdout);
 
+    state.root_index = (int)(mon - state.tokens.stack);
+    stream_tokens(&state, '+', (char *) &(char[]) {"true+false"});
+
+    puts((char *)to_string_(&state.tokens, &state.tokens.stack[1], 0, 0));
+    fflush(stdout);
+    assert(strcmp(to_string_compact(&state.tokens), "{\"mon\":[1,3,5,7,9,11,13,15,17,19,true,false],\"tue\":[0,2,4,6,8,10,12,14,16,18]}") == 0);
 
 #ifndef HAS_VLA
     printf("Total parsing time: %lld\n", total_parse_time);

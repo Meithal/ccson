@@ -6,7 +6,6 @@
 #include<string.h>
 #endif
 
-
 #if (!(defined(_WIN32) || defined(_WIN64)) \
 || defined(__CYGWIN__) \
 || defined(__MINGW32__) \
@@ -240,15 +239,10 @@ struct cisson_state {
 #endif
 };
 
-enum POINTER_ERRORS {
-    POINTER_WRONG_SYNTAX = -1,
-    POINTER_NOT_FOUND = -2
-};
 
 /* State maintenance */
 EXPORT void
 start_state(struct cisson_state * state, struct token *stack, size_t stack_size, unsigned char *pool, size_t pool_size);
-#define cs_tokens(state, index) (state)->tokens.token_stack[(index)]
 EXPORT struct token *
 query_(struct cisson_state * state, size_t length, char query[va_(length)]);
 #define query(state, string) query_((state), cs_strlen(string), (string))
@@ -265,13 +259,11 @@ EXPORT char* print_debug(struct tokens * );
 #define print_debug(_) ""
 #endif
 
+#define to_string(tokens_) (char * res)to_string_(tokens_, NULL, 2, 0)
+#define to_string_compact(tokens_) (char * res)to_string_(tokens_, NULL, 0, 0)
+#define to_string_pointer(tokens_, pointer_) (char * res)to_string_(tokens_, pointer_, 0, 0)
 EXPORT unsigned char * res
-to_string_(struct tokens * res tokens, struct token * start, int compact);
-#define to_string(tokens_) (char * res)to_string_(tokens_, NULL, 0)
-#define to_string_compact(tokens_) (char * res)to_string_(tokens_, NULL, 1)
-#define to_string_pointer(tokens_, pointer_) (char * res)to_string_(tokens_, pointer_, 1)
-EXPORT unsigned char * res
-to_stringn_(struct tokens * res tokens, struct token * start, int compact, int incomplete);
+to_string_(struct tokens * res tokens, struct token * start, int compact, int incomplete);
 /* Building */
 EXPORT void start_string(unsigned int *, const unsigned char [STRING_POOL_SIZE]);
 EXPORT void push_string(const unsigned int * res cursor, unsigned char * res pool, char* res string, int length);

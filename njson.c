@@ -227,7 +227,6 @@ rjson(size_t len,
     START_AND_PUSH_TOKEN(state, ROOT, "#root");
     PUSH_ROOT(state);
 
-    // fixme: complete example with self managed memory.
     // todo: fully test reentry
     // todo: make ANSI/STDC compatible
     // todo: complete unicode support?
@@ -652,9 +651,10 @@ EXPORT char* print_debug(struct tokens * tokens) {
 #endif
 
 static char ident_s[0x80];
-static char * print_ident(int ident, unsigned compact) {
-    cs_memset(ident_s, ' ', ident * 2 * (compact ^ 1u));
-    ident_s[ident * 2 * (compact ^ 1u)] = '\0';
+static char * print_ident(int depth, int indent) {
+    if (!depth) return "";
+    cs_memset(ident_s, ' ', indent * depth);
+    ident_s[indent * depth] = '\0';
     return ident_s;
 }
 
@@ -706,91 +706,7 @@ EXPORT size_t minified_string(unsigned char * target, const unsigned char * sour
 }
 
 EXPORT unsigned char * res
-to_string_(struct tokens * res tokens, struct token * start, int compact) {
-    // todo: make the caller handle the buffer
-    struct token *stack = tokens->stack;
-    int max = tokens->max;
-    if (start == NULL) {
-        start = &stack[1];
-    }
-
-#define cat(where, string, token) (\
-    minified_string((where), (string), *((char*)(token)->address)) \
-)
-#define cat_raw(where, string) ( \
-    cs_memcpy((where), (string), cs_strlen((string))), cs_strlen((string)) \
-)
-
-    static unsigned char output[STRING_POOL_SIZE];
-    cs_memset(output, 0, sizeof output);
-    size_t cursor = 0;
-    int ident = 0;
-    int j;
-
-    for (j = (int)(start - tokens->stack); j < max; ++j) {
-        struct token * tok = &tokens->stack[j];
-
-        if(tok->kind == UNSET || tok->kind == ROOT) {
-            continue;
-        }
-
-        if (stack[tok->root_index].kind != STRING) {
-            cursor += cat_raw(output + cursor, print_ident(ident, compact));
-        }
-
-        unsigned char dest[STRING_POOL_SIZE] = {0};
-        cs_memcpy(dest, (char*)tok->address + 1, *((char *) tok->address));
-        cursor += cat(output + cursor, dest, &stack[j]);
-
-        if(stack[j+1].root_index < start->root_index) {
-            break;
-        }
-
-        if (stack[tok->root_index].kind == OBJECT) {
-            cursor += cat_raw(output + cursor, compact ? ":" : ": ");
-        }
-
-        if(tok->kind == ARRAY || tok->kind == OBJECT) {
-            cursor += cat_raw(output + cursor, compact ? "" : "\n");
-            ident++;
-        }
-
-        if (stack[j + 1].root_index < tok->root_index && next_child(tokens, &stack[tok->root_index], &stack[j]) == NULL) {
-            int target = stack[j + 1].root_index;
-            long long cur_node = j;
-            for (;;) {
-                if(stack[stack[cur_node].root_index].kind == ARRAY) {
-                    cursor += cat_raw(output + cursor, compact ? "" : "\n");
-                    --ident;
-                    cursor += cat_raw(output + cursor, print_ident(ident, compact));
-                    cursor += cat_raw(output + cursor, "]");
-                }
-                else if(stack[stack[cur_node].root_index].kind == OBJECT) {
-                    cursor += cat_raw(output + cursor, compact ? "" : "\n");
-                    --ident;
-                    cursor += cat_raw(output + cursor, print_ident(ident, compact));
-                    cursor += cat_raw(output + cursor, "}");
-                }
-                if(stack[(cur_node = stack[cur_node].root_index)].root_index == target) {
-                    break;
-                }
-            }
-        }
-
-        if (j + 1 < max && (
-           stack[tok->root_index].kind == STRING || stack[tok->root_index].kind == ARRAY
-        ) && tok->kind != ARRAY && tok->kind != OBJECT) {
-            cursor += cat_raw(output + cursor, compact ? "," : ",\n");
-        }
-    }
-
-    return output;
-#undef cat
-#undef cat_raw
-}
-
-EXPORT unsigned char * res
-to_stringn_(struct tokens * res tokens, struct token * start, int compact, int incomplete) {
+to_string_(struct tokens * res tokens, struct token * start, int indent, int incomplete) {
     // todo: make the caller handle the buffer
 
 #define cat(where, string, token) (\
@@ -806,20 +722,57 @@ to_stringn_(struct tokens * res tokens, struct token * start, int compact, int i
 
     struct token *stack = tokens->stack;
     if (start == NULL) {
-        start = &stack[1];
+        start = &stack[0];
     }
 
+    int depth = 0;
     struct token * tok = start;
     struct token * active_root = start;
     unsigned char buf[STRING_POOL_SIZE] = {0};
     do {
-        cs_memcpy(buf, (char*)tok->address + 1, *((char *) tok->address));
-        cursor += cat(output + cursor, buf, tok);
-        cs_memset(buf, 0, *((char *) tok->address));
+        if (stack[tok->root_index].kind != STRING) {
+            cursor += cat_raw(output + cursor, print_ident(depth, indent));
+        }
+
+        if(tok->kind != ROOT) {
+            cs_memcpy(buf, (char *) tok->address + 1,
+                      *((char *) tok->address));
+            cursor += cat(output + cursor, buf, tok);
+            cs_memset(buf, 0, *((char *) tok->address));
+        }
+
+        if (stack[tok->root_index].kind == OBJECT && tok->kind == STRING) {
+            cursor += cat_raw(output + cursor, indent ? ": " :  ":");
+        }
+
+        if(tok->kind == ARRAY || tok->kind == OBJECT) {
+            cursor += cat_raw(output + cursor, !indent ? "" : "\n");
+            depth++;
+        }
 
         while(next_child(tokens, active_root, tok) == NULL) {
+            if((stack[tok->root_index].kind == ARRAY || stack[tok->root_index].kind == OBJECT) && active_root->kind != STRING) {
+                cursor += cat_raw(output + cursor, !indent ? "" : "\n");
+                --depth, depth < 0 ? depth = 0 : 0;
+                cursor += cat_raw(output + cursor,
+                                  print_ident(depth,
+                                              indent));
+            }
+
+            char end[2] = {"\0]}"[in((char[]){ARRAY, OBJECT}, active_root->kind)], '\0'};
+            cursor += cat_raw(output + cursor, end);
+
+            if (active_root == start && next_child(tokens, active_root, tok) == NULL) {
+                goto end;
+            }
             active_root = &stack[active_root->root_index];
-            if (active_root == start && next_child(tokens, active_root, tok) == NULL) goto end;
+        }
+
+        if ((
+                stack[tok->root_index].kind == STRING || stack[tok->root_index].kind == ARRAY
+        ) && tok->kind != ARRAY && tok->kind != OBJECT) {
+            cursor += cat_raw(output + cursor,
+                              indent ? ",\n" : ",");
         }
 
         tok = next_child(tokens, active_root, tok);
@@ -827,8 +780,8 @@ to_stringn_(struct tokens * res tokens, struct token * start, int compact, int i
             active_root = tok;
         }
     } while(1);
-    end:
 
+    end:
     return output;
 #undef cat
 #undef cat_raw

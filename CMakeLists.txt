@@ -62,7 +62,7 @@ if(CISSON_RUN_TESTS)
     endif()
 endif()
 
-option(CISSON_WANT_SINGLE_HEADER_LIB "Generate a single header file by concatenating 2 files." OFF)
+option(CISSON_WANT_SINGLE_HEADER_LIB "Generate a single header file by concatenating 2 files." ON)
 if(CISSON_WANT_SINGLE_HEADER_LIB)
     add_custom_command(TARGET tests PRE_BUILD COMMAND cmake -P ${CMAKE_CURRENT_SOURCE_DIR}/concat.cmake VERBATIM)
 endif()

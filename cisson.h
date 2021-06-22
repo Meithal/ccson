@@ -8,10 +8,6 @@
 #include<string.h>
 #endif
 
-#ifdef __cplusplus
-extern "C" {
-#endif /* __cplusplus */
-
 #if (!(defined(_WIN32) || defined(_WIN64)) \
 || defined(__CYGWIN__) \
 || defined(__MINGW32__) \
@@ -38,7 +34,6 @@ extern "C" {
 
 #ifndef NULL  /* No libC */
 #define size_t unsigned long long
-#define ptrdiff_t long long
 #define NULL ((void *)0)
 #endif
 
@@ -246,16 +241,10 @@ struct cisson_state {
 #endif
 };
 
-enum POINTER_ERRORS {
-    POINTER_WRONG_SYNTAX = -1,
-    POINTER_NOT_FOUND = -2
-};
-#define NO_CHILD (-2)
 
 /* State maintenance */
 EXPORT void
 start_state(struct cisson_state * state, struct token *stack, size_t stack_size, unsigned char *pool, size_t pool_size);
-#define cs_tokens(state, index) (state)->tokens.token_stack[(index)]
 EXPORT struct token *
 query_(struct cisson_state * state, size_t length, char query[va_(length)]);
 #define query(state, string) query_((state), cs_strlen(string), (string))
@@ -272,13 +261,11 @@ EXPORT char* print_debug(struct tokens * );
 #define print_debug(_) ""
 #endif
 
+#define to_string(tokens_) (char * res)to_string_(tokens_, NULL, 2, 0)
+#define to_string_compact(tokens_) (char * res)to_string_(tokens_, NULL, 0, 0)
+#define to_string_pointer(tokens_, pointer_) (char * res)to_string_(tokens_, pointer_, 0, 0)
 EXPORT unsigned char * res
-to_string_(struct tokens * res tokens, struct token * start, int compact);
-#define to_string(tokens_) (char * res)to_string_(tokens_, NULL, 0)
-#define to_string_compact(tokens_) (char * res)to_string_(tokens_, NULL, 1)
-#define to_string_pointer(tokens_, pointer_) (char * res)to_string_(tokens_, pointer_, 1)
-EXPORT unsigned char * res
-to_stringn_(struct tokens * res tokens, struct token * start, int compact, int incomplete);
+to_string_(struct tokens * res tokens, struct token * start, int compact, int incomplete);
 /* Building */
 EXPORT void start_string(unsigned int *, const unsigned char [STRING_POOL_SIZE]);
 EXPORT void push_string(const unsigned int * res cursor, unsigned char * res pool, char* res string, int length);
@@ -292,7 +279,7 @@ insert_token(struct cisson_state * state, char *token, struct token* root);
 #define push_token(state, token) insert_token((state), (token), &(state)->tokens.stack[(state)->root_index])
 EXPORT void
 stream_tokens_(struct cisson_state * state, char separator, char *stream, size_t length);
-#define stream_tokens(state, sep, stream) stream_tokens_((state), (sep), (stream), cs_strlen(stream));
+#define stream_tokens(state, sep, stream) stream_tokens_((state), (sep), (stream), cs_strlen(stream))
 #define START_STRING(state_) start_string(&(state_)->strings.cursor, (state_)->strings.pool)
 #define PUSH_STRING(state_, string_, length_) \
     push_string(                               \
@@ -328,9 +315,6 @@ stream_tokens_(struct cisson_state * state, char separator, char *stream, size_t
     INSERT_STRING_TOKEN((kind), (state), (root))
 /* __/ */
 
-#ifdef __cplusplus
-}
-#endif /* __cplusplus */
 
 /* Stripped header guard. */
 
@@ -453,9 +437,21 @@ start_state(
     state->root_index = -1;
 }
 
-static int next_child(struct tokens *  tokens, int root_idx, int current_idx) {
+static struct token *
+next_child(struct tokens *  tokens, struct token * root, struct token * current) {
+    int root_idx = (int)(root - tokens->stack);
+
     int start = (root_idx + 1) % tokens->max;
-    if (current_idx >= 0) {
+
+    if (current == root) {
+        current = NULL;
+    }
+
+    if (current != NULL) {
+        while (current->root_index != root_idx) {
+            current = &tokens->stack[current->root_index];
+        }
+        int current_idx = (int)(current - tokens->stack);
         start = (current_idx + 1) % tokens->max;
     }
     int i;
@@ -464,20 +460,20 @@ static int next_child(struct tokens *  tokens, int root_idx, int current_idx) {
             i != root_idx;
             i++, i%=tokens->max) {
         if (tokens->stack[i].root_index == root_idx) {
-            return i;
+            return &tokens->stack[i];
         }
     }
-    return NO_CHILD;
+    return NULL;
 }
 
 EXPORT struct token *
 query_(struct cisson_state * state, size_t length, char query[va_(length)]) {
     size_t i = 0;
-    int token_index = 1;
+    struct token * cursor = &state->tokens.stack[1];
 
     while (i < length) {
         if (query[i] == '/') {
-            if(state->tokens.stack[token_index].kind != OBJECT && state->tokens.stack[token_index].kind != ARRAY) {
+            if(cursor->kind != OBJECT && cursor->kind != ARRAY) {
                 return NULL;
             }
             i++;
@@ -485,33 +481,33 @@ query_(struct cisson_state * state, size_t length, char query[va_(length)]) {
             while (i + token_length < length && query[i + token_length] != '/') {
                 token_length++;
             }
-            unsigned char buffer[0x80] = { '"' * (state->tokens.stack[token_index].kind == OBJECT) };
-            cs_memcpy(&buffer[1 * (state->tokens.stack[token_index].kind == OBJECT)], &query[i], token_length);
-            buffer[1 + token_length] = '"' * (state->tokens.stack[token_index].kind == OBJECT);
+            unsigned char buffer[0x80] = { '"' * (cursor->kind == OBJECT) };
+            cs_memcpy(&buffer[1 * (cursor->kind == OBJECT)], &query[i], token_length);
+            buffer[1 + token_length] = '"' * (cursor->kind == OBJECT);
 
-            if (state->tokens.stack[token_index].kind == ARRAY) {
+            if (cursor->kind == ARRAY) {
                 int index = 0;
                 int j;
                 for (j = 0; buffer[j]; j++) {
                     index *= 10;
                     index += buffer[j] - '0';
                 }
-                int cur = -1;
+                struct token * cur = NULL;
                 do {
-                    cur = next_child(&state->tokens, token_index, cur);
+                    cur = next_child(&state->tokens, cursor, cur);
                 } while (index--);
-                token_index = cur;
-            } else if (state->tokens.stack[token_index].kind == OBJECT) {
+                cursor = cur;
+            } else if (cursor->kind == OBJECT) {
                 int index = state->tokens.max;
-                int cur = -1;
+                struct token * cur = NULL;
                 do {
-                    cur = next_child(&state->tokens, token_index, cur);
-                    if (cs_memcmp(state->tokens.stack[cur].address + 1,
+                    cur = next_child(&state->tokens, cursor, cur);
+                    if (cs_memcmp(cur->address + 1,
                                   buffer,
                                   token_length + 2) == 0) {
-                        token_index = next_child(&state->tokens,
+                        cursor = next_child(&state->tokens,
                                                  cur,
-                                                 -1);
+                                                 NULL);
                         break;
                     }
                 } while (index--);
@@ -521,7 +517,7 @@ query_(struct cisson_state * state, size_t length, char query[va_(length)]) {
         i++;
     }
 
-    return &state->tokens.stack[token_index];
+    return cursor;
 }
 
 EXPORT enum json_errors
@@ -552,7 +548,6 @@ rjson(size_t len,
     START_AND_PUSH_TOKEN(state, ROOT, "#root");
     PUSH_ROOT(state);
 
-    // fixme: complete example with self managed memory.
     // todo: fully test reentry
     // todo: make ANSI/STDC compatible
     // todo: complete unicode support?
@@ -977,9 +972,10 @@ EXPORT char* print_debug(struct tokens * tokens) {
 #endif
 
 static char ident_s[0x80];
-static char * print_ident(int ident, unsigned compact) {
-    cs_memset(ident_s, ' ', ident * 2 * (compact ^ 1u));
-    ident_s[ident * 2 * (compact ^ 1u)] = '\0';
+static char * print_ident(int depth, int indent) {
+    if (!depth) return "";
+    cs_memset(ident_s, ' ', indent * depth);
+    ident_s[indent * depth] = '\0';
     return ident_s;
 }
 
@@ -1031,13 +1027,8 @@ EXPORT size_t minified_string(unsigned char * target, const unsigned char * sour
 }
 
 EXPORT unsigned char * res
-to_string_(struct tokens * res tokens, struct token * start, int compact) {
+to_string_(struct tokens * res tokens, struct token * start, int indent, int incomplete) {
     // todo: make the caller handle the buffer
-    struct token *stack = tokens->stack;
-    int max = tokens->max;
-    if (start == NULL) {
-        start = &stack[1];
-    }
 
 #define cat(where, string, token) (\
     minified_string((where), (string), *((char*)(token)->address)) \
@@ -1049,109 +1040,69 @@ to_string_(struct tokens * res tokens, struct token * start, int compact) {
     static unsigned char output[STRING_POOL_SIZE];
     cs_memset(output, 0, sizeof output);
     size_t cursor = 0;
-    int ident = 0;
-    int j;
 
-    for (j = (int)(start - tokens->stack); j < max; ++j) {
-        struct token * tok = &tokens->stack[j];
+    struct token *stack = tokens->stack;
+    if (start == NULL) {
+        start = &stack[0];
+    }
 
-        if(tok->kind == UNSET || tok->kind == ROOT) {
-            continue;
-        }
-
+    int depth = 0;
+    struct token * tok = start;
+    struct token * active_root = start;
+    unsigned char buf[STRING_POOL_SIZE] = {0};
+    do {
         if (stack[tok->root_index].kind != STRING) {
-            cursor += cat_raw(output + cursor, print_ident(ident, compact));
+            cursor += cat_raw(output + cursor, print_ident(depth, indent));
         }
 
-        unsigned char dest[STRING_POOL_SIZE] = {0};
-        cs_memcpy(dest, (char*)tok->address + 1, *((char *) tok->address));
-        cursor += cat(output + cursor, dest, &stack[j]);
-
-        if(stack[j+1].root_index < start->root_index) {
-            break;
+        if(tok->kind != ROOT) {
+            cs_memcpy(buf, (char *) tok->address + 1,
+                      *((char *) tok->address));
+            cursor += cat(output + cursor, buf, tok);
+            cs_memset(buf, 0, *((char *) tok->address));
         }
 
-        if (stack[tok->root_index].kind == OBJECT) {
-            cursor += cat_raw(output + cursor, compact ? ":" : ": ");
+        if (stack[tok->root_index].kind == OBJECT && tok->kind == STRING) {
+            cursor += cat_raw(output + cursor, indent ? ": " :  ":");
         }
 
         if(tok->kind == ARRAY || tok->kind == OBJECT) {
-            cursor += cat_raw(output + cursor, compact ? "" : "\n");
-            ident++;
+            cursor += cat_raw(output + cursor, !indent ? "" : "\n");
+            depth++;
         }
 
-        if (stack[j + 1].root_index < tok->root_index && next_child(tokens, tok->root_index, j) == NO_CHILD) {
-            int target = stack[j + 1].root_index;
-            ptrdiff_t cur_node = j;
-            for (;;) {
-                if(stack[stack[cur_node].root_index].kind == ARRAY) {
-                    cursor += cat_raw(output + cursor, compact ? "" : "\n");
-                    --ident;
-                    cursor += cat_raw(output + cursor, print_ident(ident, compact));
-                    cursor += cat_raw(output + cursor, "]");
-                }
-                else if(stack[stack[cur_node].root_index].kind == OBJECT) {
-                    cursor += cat_raw(output + cursor, compact ? "" : "\n");
-                    --ident;
-                    cursor += cat_raw(output + cursor, print_ident(ident, compact));
-                    cursor += cat_raw(output + cursor, "}");
-                }
-                if(stack[(cur_node = stack[cur_node].root_index)].root_index == target) {
-                    break;
-                }
+        while(next_child(tokens, active_root, tok) == NULL) {
+            if((stack[tok->root_index].kind == ARRAY || stack[tok->root_index].kind == OBJECT) && active_root->kind != STRING) {
+                cursor += cat_raw(output + cursor, !indent ? "" : "\n");
+                --depth, depth < 0 ? depth = 0 : 0;
+                cursor += cat_raw(output + cursor,
+                                  print_ident(depth,
+                                              indent));
             }
+
+            char end[2] = {"\0]}"[in((char[]){ARRAY, OBJECT}, active_root->kind)], '\0'};
+            cursor += cat_raw(output + cursor, end);
+
+            if (active_root == start && next_child(tokens, active_root, tok) == NULL) {
+                goto end;
+            }
+            active_root = &stack[active_root->root_index];
         }
 
-        if (j + 1 < max && (
-           stack[tok->root_index].kind == STRING || stack[tok->root_index].kind == ARRAY
+        if ((
+                stack[tok->root_index].kind == STRING || stack[tok->root_index].kind == ARRAY
         ) && tok->kind != ARRAY && tok->kind != OBJECT) {
-            cursor += cat_raw(output + cursor, compact ? "," : ",\n");
+            cursor += cat_raw(output + cursor,
+                              indent ? ",\n" : ",");
         }
-    }
 
-    return output;
-#undef cat
-#undef cat_raw
-}
-
-EXPORT unsigned char * res
-to_stringn_(struct tokens * res tokens, struct token * start, int compact, int incomplete) {
-    // todo: make the caller handle the buffer
-    struct token *stack = tokens->stack;
-    int max = tokens->max;
-    if (start == NULL) {
-        start = &stack[1];
-    }
-
-#define cat(where, string, token) (\
-    minified_string((where), (string), *((char*)(token)->address)) \
-)
-#define cat_raw(where, string) ( \
-    cs_memcpy((where), (string), cs_strlen((string))), cs_strlen((string)) \
-)
-
-    static unsigned char output[STRING_POOL_SIZE];
-    cs_memset(output, 0, sizeof output);
-    size_t cursor = 0;
-    int ident = 0;
-    int j;
-
-    struct token * tok = start;
-    struct token * active_root = start;
-    do {
-        unsigned char dest[STRING_POOL_SIZE] = {0};
-        cs_memcpy(dest, (char*)tok->address + 1, *((char *) tok->address));
-        cursor += cat(output + cursor, dest, tok);
-
-        if(next_child(tokens, start - stack, tok - stack) == NO_CHILD) {
-            break;
-        }
-        tok = &stack[next_child(tokens, active_root - stack, tok - stack)];
-        if (tok->kind == OBJECT || tok->kind == ARRAY | tok->kind == STRING && stack[tok->root_index].kind == OBJECT) {
+        tok = next_child(tokens, active_root, tok);
+        if (tok->kind == OBJECT || tok->kind == ARRAY || tok->kind == STRING && stack[tok->root_index].kind == OBJECT) {
             active_root = tok;
         }
     } while(1);
 
+    end:
     return output;
 #undef cat
 #undef cat_raw
