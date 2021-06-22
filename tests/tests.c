@@ -45,8 +45,8 @@ elapsed(LONGLONG start, LONGLONG frequency) {
             .QuadPart=ending_time.QuadPart - start
     };
 
-//    elapsed_microseconds.QuadPart *= 1000000;
-//    elapsed_microseconds.QuadPart /= frequency;
+    elapsed_microseconds.QuadPart *= 1000000;
+    elapsed_microseconds.QuadPart /= frequency;
 
     return elapsed_microseconds.QuadPart;
 }
@@ -63,7 +63,7 @@ start_timer() {
 
 LONGLONG
 elapsed(LONGLONG start, LONGLONG frequency) {
-    return 0LL;
+    return start * frequency *0LL;
 }
 
 #endif
@@ -521,7 +521,7 @@ int main(int argc, char** argv) {
         sprintf(buf, "%d", j);
         insert_token(&state, buf, j % 2 ? mon : tue);
     }
-    //puts(to_string_compact(&state.tokens));
+    puts((char *)to_stringn_(&state.tokens, &state.tokens.stack[1], 0, 0));
     fflush(stdout);
 
 
@@ -537,10 +537,10 @@ int main(int argc, char** argv) {
     }
     fprintf(
             file,
-            "Total parsing time: %lld ; Writing: %lld ; %s %s - %s\n",
+            "Total parsing time: %lld ; Writing: %lld ; %s - %s\n",
             total_parse_time,
             total_write_time,
-            LAST_COMMIT_HASH, LAST_COMMIT_COUNT, CMAKE_GENERATOR);
+            LAST_COMMIT_COUNT, CMAKE_GENERATOR);
     fclose(file);
 #endif
 

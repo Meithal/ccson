@@ -26,7 +26,12 @@ project(Cisson
 
 set(CMAKE_C_STANDARD 90 CACHE STRING "ANSI C by default")
 
-set(JSON_FILES json.h njson.c)
+set(JSON_FILES
+        json.h
+        njson.c)
+
+add_compile_definitions(LAST_COMMIT_COUNT="${_var_LAST_COMMIT}")
+add_compile_definitions(CMAKE_GENERATOR="$CACHE{CMAKE_C_COMPILER}")
 
 option(CISSON_BUILD_SHARED ON)
 option(CISSON_BUILD_STATIC ON)

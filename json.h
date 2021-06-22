@@ -33,7 +33,6 @@
 
 #ifndef NULL  /* No libC */
 #define size_t unsigned long long
-#define ptrdiff_t long long
 #define NULL ((void *)0)
 #endif
 
@@ -245,7 +244,6 @@ enum POINTER_ERRORS {
     POINTER_WRONG_SYNTAX = -1,
     POINTER_NOT_FOUND = -2
 };
-#define NO_CHILD (-2)
 
 /* State maintenance */
 EXPORT void
@@ -272,6 +270,8 @@ to_string_(struct tokens * res tokens, struct token * start, int compact);
 #define to_string(tokens_) (char * res)to_string_(tokens_, NULL, 0)
 #define to_string_compact(tokens_) (char * res)to_string_(tokens_, NULL, 1)
 #define to_string_pointer(tokens_, pointer_) (char * res)to_string_(tokens_, pointer_, 1)
+EXPORT unsigned char * res
+to_stringn_(struct tokens * res tokens, struct token * start, int compact, int incomplete);
 /* Building */
 EXPORT void start_string(unsigned int *, const unsigned char [STRING_POOL_SIZE]);
 EXPORT void push_string(const unsigned int * res cursor, unsigned char * res pool, char* res string, int length);
@@ -285,7 +285,7 @@ insert_token(struct cisson_state * state, char *token, struct token* root);
 #define push_token(state, token) insert_token((state), (token), &(state)->tokens.stack[(state)->root_index])
 EXPORT void
 stream_tokens_(struct cisson_state * state, char separator, char *stream, size_t length);
-#define stream_tokens(state, sep, stream) stream_tokens_((state), (sep), (stream), cs_strlen(stream));
+#define stream_tokens(state, sep, stream) stream_tokens_((state), (sep), (stream), cs_strlen(stream))
 #define START_STRING(state_) start_string(&(state_)->strings.cursor, (state_)->strings.pool)
 #define PUSH_STRING(state_, string_, length_) \
     push_string(                               \

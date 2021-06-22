@@ -31,71 +31,7 @@ the JSON pointer syntax.
 ```c
 #define CISSON_IMPLEMENTATION
 #include "cisson.h"
-#include <stdio.h> 
-
-int main(void) {
-    struct foo = {
-        .foo = "bar",
-        .array = {1, 2, 3},
-        .question = true
-    };
-    
-    char vals[3][10] = { 0 };
-    sprintf(vals[0], "%d", foo.array[0]);
-    sprintf(vals[1], "%d", foo.array[1]);
-    sprintf(vals[2], "%d", foo.array[2]);
-    
-    struct cisson_state state = {0};
-    
-    start_state(&state, static_stack, sizeof static_stack,
-        static_pool, sizeof static_pool);
-    
-    START_AND_PUSH_TOKEN(&state, ROOT, "#custom root");
-    PUSH_ROOT(&state);
-    START_AND_PUSH_TOKEN(&state, OBJECT, "{");
-    PUSH_ROOT(&state);
-    START_AND_PUSH_TOKEN(&state, STRING, "\"foo\"");
-    PUSH_ROOT(&state);
-    START_AND_PUSH_TOKEN(&state, STRING, foo.foo);
-    CLOSE_ROOT(&state);
-    START_AND_PUSH_TOKEN(&state, STRING, "\"array\"");
-    PUSH_ROOT(&state);
-    START_AND_PUSH_TOKEN(&state, ARRAY, "[");
-    PUSH_ROOT(&state);
-    START_AND_PUSH_TOKEN(&state, NUMBER, vals[0]);
-    START_AND_PUSH_TOKEN(&state, NUMBER, vals[1]);
-    START_AND_PUSH_TOKEN(&state, NUMBER, vals[2]);
-    CLOSE_ROOT(&state);
-    CLOSE_ROOT(&state);
-    START_AND_PUSH_TOKEN(&state, STRING, "\"question\"");
-    PUSH_ROOT(&state);
-    START_AND_PUSH_TOKEN(&state, foo.question ? TRUE : FALSE, foo.question ? "true" : "false");
-    puts(to_string(&state.tokens)); /* {"foo":"bar","array":[1,2,4],"question":true} */
-}
-```
-Every token has a root that it binds to. The state keeps
-in memory what the current root is, for example if the current root
-is an array, every token we push will be a value of this array. 
-This allows to resume the building of the JSON tree at any time. 
-
-Array elements have as root their array; 
-Object properties have as root their object; 
-The values associated to object properties have as root that 
-very property. When we call `PUSH_ROOT`, we change the root
-the next tokens will have their root as. When calling
-`CLOSE_ROOT`, the current root will become what the root of the 
-current root was, hence going back in the
-hierarchy of roots by one notch.
-
-Cisson only accepts string values, you must convert your non-string
-values before they can be tokenized; by using `sprintf` for example.
-
-`to_string` converts your cisson object into a JSON string
-and returns a pointer to it.
-
-With `push_token`, we can rewrite the previous code like this
-```c
-#include "json.h"
+#include <stdio.h>
 
 int main() {
     struct cisson_state state = {0};
@@ -127,10 +63,28 @@ int main() {
 
 }
 ```
-The `>` symbol closes a root and replaces `CLOSE_ROOT`.
-`PUSH_ROOT` is called on the following tokens: `{`, `[`, `:`, `#`.
-We don't have to provide the nature of the token we want to push,
-as it can be guessed by the first character of the string.
+Every token has a root that it binds to. The state keeps
+in memory what the current root is, for example if the current root
+is an array, every token we push will be a value of this array.
+This allows to resume the building of the JSON tree at any time.
+
+Array elements have as root their array;
+Object properties have as root their object;
+The values associated to object properties have as root that
+very property. 
+
+When we meet any of these characters `{`, `[`, `:`, `#`
+, we change the root the next tokens will have their root as. 
+When meeting `>`, the current root will become what the root of the
+current root was, hence going back in the
+hierarchy of roots by one notch. The nature of the root
+we close doesn't matter, so we use a generic character. 
+
+Cisson only accepts string values, you must convert your non-string
+values before they can be tokenized; by using `sprintf` for example.
+
+`to_string` converts your cisson object into a JSON string
+and returns a pointer to it.
 
 `stream_tokens` can be used to compress the previous code even further.
 
@@ -159,7 +113,7 @@ build a JSON object.
 ***
 
 To convert the JSON `{"foo":"bar","array":[1,2,4],"question":true}`
-into a C object,
+to a C object
 
 ```c
 #define CISSON_IMPLEMENTATION
@@ -211,4 +165,4 @@ It also has a `.kind` property.
 
 We used our own pool of memory instead of using the 
 shared static one, since our object will point to it, 
-and we don't want to lose the value.
+and we don't want to lose the value we point on.
