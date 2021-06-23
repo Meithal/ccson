@@ -88,8 +88,10 @@ insert_token(struct cisson_state * state, char *token, struct token* root) {
 }
 
 EXPORT void
-stream_tokens_(struct cisson_state * state, char separator, char *stream, size_t length) {
+stream_tokens_(struct cisson_state * state, struct token * where, char separator, char *stream, size_t length) {
     size_t i = 0;
+    int old_root = state->root_index;
+    state->root_index = (int)(where - state->tokens.stack);
     while (i < length) {
         size_t token_length = 0;
         while (i + token_length < length && stream[i + token_length] != separator) {
@@ -99,6 +101,7 @@ stream_tokens_(struct cisson_state * state, char separator, char *stream, size_t
         push_token(state, &stream[i]);
         i = i + token_length + sizeof separator;
     }
+    state->root_index = old_root;
 }
 
 EXPORT void
@@ -200,19 +203,29 @@ query_(struct cisson_state * state, size_t length, char query[va_(length)]) {
 }
 
 EXPORT enum json_errors
+inject_(size_t len,
+       unsigned char text[va_(len)],
+       struct cisson_state * state,
+       struct token * where) {
+    enum states old_state = state->cur_state;
+    int old_root = state->root_index;
+    state->root_index = (int)(where - state->tokens.stack);
+    state->cur_state = EXPECT_BOM;
+    enum json_errors error = rjson(cs_strlen((char*)text), (unsigned char*)text, state);
+    state->cur_state = old_state;
+    state->root_index = old_root;
+    return error;
+}
+
+EXPORT enum json_errors
 rjson(size_t len,
       unsigned char cursor[va_(len)],
-      struct cisson_state * external_state) {
+      struct cisson_state * state) {
 
 #define peek_at(where) cursor[where]
 #define SET_STATE_AND_ADVANCE_BY(which_, advance_) \
   state->cur_state = which_; cursor += advance_
 
-    struct cisson_state local_state_ = {0 };
-    struct cisson_state * state = &local_state_;
-    if(external_state != NULL) {
-        state = external_state;
-    }
     if (state->tokens.stack == NULL) {
         start_state(
                 state,
@@ -222,10 +235,13 @@ rjson(size_t len,
                 sizeof static_pool);
     }
 
+    if(state->tokens.stack->kind == UNSET) {
+        START_AND_PUSH_TOKEN(state, ROOT, "#root");
+        PUSH_ROOT(state);
+    }
+
     enum json_errors error = JSON_ERROR_NO_ERRORS;
     unsigned char * final = cursor + len;
-    START_AND_PUSH_TOKEN(state, ROOT, "#root");
-    PUSH_ROOT(state);
 
     // todo: fully test reentry
     // todo: make ANSI/STDC compatible

@@ -510,8 +510,7 @@ int main(int argc, char** argv) {
     fflush(stdout);
     puts("\n\n*** EDITION ***");
 
-    start_state(&state, static_stack, sizeof static_stack,
-                static_pool, sizeof static_pool);
+    memset(&state, 0, sizeof state);
     rjson(19, (unsigned char*)"{\"mon\":[],\"tue\":[]}", &state);
     struct token* mon = query(&state, "/mon");
     struct token* tue = query(&state, "/tue");
@@ -522,12 +521,12 @@ int main(int argc, char** argv) {
         insert_token(&state, buf, j % 2 ? mon : tue);
     }
 
-    state.root_index = (int)(mon - state.tokens.stack);
-    stream_tokens(&state, '+', (char *) &(char[]) {"true+false"});
+    stream_into(&state, mon, '+', (char *) &(char[]) {"true+false"});
+    inject("[1, 2, 3]", &state, query(&state, "/tue"));
 
     puts((char *)to_string_(&state.tokens, &state.tokens.stack[1], 0, 0));
     fflush(stdout);
-    assert(strcmp(to_string_compact(&state.tokens), "{\"mon\":[1,3,5,7,9,11,13,15,17,19,true,false],\"tue\":[0,2,4,6,8,10,12,14,16,18]}") == 0);
+    assert(strcmp(to_string_compact(&state.tokens), "{\"mon\":[1,3,5,7,9,11,13,15,17,19,true,false],\"tue\":[0,2,4,6,8,10,12,14,16,18,[1,2,3]]}") == 0);
 
 #ifndef HAS_VLA
     printf("Total parsing time: %lld\n", total_parse_time);

@@ -252,6 +252,12 @@ EXPORT enum json_errors rjson(
         size_t len,
         unsigned char cursor[va_(len)],
         struct cisson_state * state);
+EXPORT enum json_errors
+inject_(size_t len,
+       unsigned char text[va_(len)],
+       struct cisson_state * state,
+       struct token * where);
+#define inject(text, state, where) inject_(cs_strlen((text)), (unsigned char*)(text), (state), (where))
 /* Output */
 #ifdef WANT_LIBC
 EXPORT char* print_debug(struct tokens * );
@@ -276,8 +282,9 @@ EXPORT void
 insert_token(struct cisson_state * state, char *token, struct token* root);
 #define push_token(state, token) insert_token((state), (token), &(state)->tokens.stack[(state)->root_index])
 EXPORT void
-stream_tokens_(struct cisson_state * state, char separator, char *stream, size_t length);
-#define stream_tokens(state, sep, stream) stream_tokens_((state), (sep), (stream), cs_strlen(stream))
+stream_tokens_(struct cisson_state * state, struct token * where, char separator, char *stream, size_t length);
+#define stream_tokens(state, sep, stream) stream_tokens_((state), &(state)->tokens.stack[(state)->root_index], (sep), (stream), cs_strlen(stream))
+#define stream_into(state, where, sep, stream) stream_tokens_((state), (where), (sep), (stream), cs_strlen(stream))
 #define START_STRING(state_) start_string(&(state_)->strings.cursor, (state_)->strings.pool)
 #define PUSH_STRING(state_, string_, length_) \
     push_string(                               \

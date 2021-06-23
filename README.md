@@ -36,8 +36,6 @@ the JSON pointer syntax.
 int main() {
     struct cisson_state state = {0};
     
-    start_state(&state, static_stack, sizeof static_stack,
-                static_pool, sizeof static_pool);
     /* cisson has a static stack of tokens and a static pool
      * of characters where the token contents will be copied to.
      * You can use your own stack and pool if you plan to 
@@ -93,9 +91,6 @@ and returns a pointer to it.
 
 int main() {
     struct cisson_state state = {0};
-    
-    start_state(&state, static_stack, sizeof static_stack,
-                static_pool, sizeof static_pool);
 
     stream_tokens(&state, '~',
         &(char[]){"#smart root~{~\"foo\"~:~\"bar\"~>~\"array\"~:~[~1~2~4~>>~\"question\"~:~true"});
@@ -135,8 +130,6 @@ int main(void) {
     struct cisson_state state;
     struct token stack[0x200];
     char pool[0x200];
-    start_state(&state, stack, sizeof stack,
-        pool, sizeof pool);
 
     enum json_errors error = rjson(strlen(json), json, &state);
     
