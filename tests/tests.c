@@ -345,7 +345,8 @@ int main(int argc, char** argv) {
     for (i = 0; i < sizeof(valid_json) / sizeof(valid_json[0]) ; i++) {
         long long start = start_timer();
         struct cisson_state state = {0 };
-        enum json_errors error = rjson(cs_strlen(valid_json[i].str), (unsigned char*)valid_json[i].str, &state);
+        enum json_errors error = rjson(
+                valid_json[i].str, &state);
         long long end = elapsed(start, frequency);
         total_parse_time += end;
         printf("%d: For >>> %s <<<, elapsed: %lld\n -> %s\n", i, valid_json[i].str, end, json_errors[error]);
@@ -368,7 +369,8 @@ int main(int argc, char** argv) {
 
         struct cisson_state state = {0 };
         long long start = start_timer();
-        enum json_errors error = rjson(cs_strlen(bogus_json[i].st), (unsigned char*)bogus_json[i].st, &state);
+        enum json_errors error = rjson(
+                bogus_json[i].st, &state);
         long long end = elapsed(start, frequency);
         total_parse_time += end;
         printf("%d: For >>> %s <<<, elapsed: %lld\n -> %s\n", i, bogus_json[i].st, end, json_errors[error]);
@@ -388,7 +390,10 @@ int main(int argc, char** argv) {
 
         struct cisson_state state = {0 };
         long long start = start_timer();
-        enum json_errors error = rjson(bin_safe_json[i].size, (unsigned char*)bin_safe_json[i].str, &state);
+        enum json_errors error = rjson_(
+                bin_safe_json[i].size,
+                (unsigned char *) bin_safe_json[i].str,
+                &state);
         long long end = elapsed(start, frequency);
         total_parse_time += end;
         printf("%d: For >>> %s <<<, elapsed: %lld\n -> %s\n", i, bin_safe_json[i].str, end, json_errors[error]);
@@ -511,7 +516,8 @@ int main(int argc, char** argv) {
     puts("\n\n*** EDITION ***");
 
     memset(&state, 0, sizeof state);
-    rjson(19, (unsigned char*)"{\"mon\":[],\"tue\":[]}", &state);
+    rjson("{\"mon\":[],\"tue\":[]}",
+           &state);
     struct token* mon = query(&state, "/mon");
     struct token* tue = query(&state, "/tue");
     char buf[4];
@@ -523,10 +529,13 @@ int main(int argc, char** argv) {
 
     stream_into(&state, mon, '+', (char *) &(char[]) {"true+false"});
     inject("[1, 2, 3]", &state, query(&state, "/tue"));
+    inject("\"fri\"", &state, query(&state, ""));
+    move(&state, query(&state, "/mon"), query(&state, "/fri/<"));
+    delete(query(&state, "/mon/<"));
 
-    puts((char *)to_string_(&state.tokens, &state.tokens.stack[1], 0, 0));
+    puts((char *)to_string(&state.tokens));
     fflush(stdout);
-    assert(strcmp(to_string_compact(&state.tokens), "{\"mon\":[1,3,5,7,9,11,13,15,17,19,true,false],\"tue\":[0,2,4,6,8,10,12,14,16,18,[1,2,3]]}") == 0);
+    assert(strcmp(to_string_compact(&state.tokens), "{\"tue\":[0,2,4,6,8,10,12,14,16,18,[1,2,3]],\"fri\":[1,3,5,7,9,11,13,15,17,19,true,false]}") == 0);
 
 #ifndef HAS_VLA
     printf("Total parsing time: %lld\n", total_parse_time);

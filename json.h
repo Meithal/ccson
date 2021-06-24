@@ -246,12 +246,15 @@ start_state(struct cisson_state * state, struct token *stack, size_t stack_size,
 EXPORT struct token *
 query_(struct cisson_state * state, size_t length, char query[va_(length)]);
 #define query(state, string) query_((state), cs_strlen(string), (string))
-
+EXPORT int
+index(struct token* stack, struct token* which);
 /* Parsing */
-EXPORT enum json_errors rjson(
+EXPORT enum json_errors
+rjson_(
         size_t len,
-        unsigned char cursor[va_(len)],
+        unsigned char *cursor,
         struct cisson_state * state);
+#define rjson(text, state) rjson_(cs_strlen((text)), (unsigned char*)(text), (state))
 EXPORT enum json_errors
 inject_(size_t len,
        unsigned char text[va_(len)],
@@ -265,11 +268,11 @@ EXPORT char* print_debug(struct tokens * );
 #define print_debug(_) ""
 #endif
 
-#define to_string(tokens_) (char * res)to_string_(tokens_, NULL, 2, 0)
-#define to_string_compact(tokens_) (char * res)to_string_(tokens_, NULL, 0, 0)
-#define to_string_pointer(tokens_, pointer_) (char * res)to_string_(tokens_, pointer_, 0, 0)
+#define to_string(tokens_) (char * res)to_string_(tokens_, NULL, 2)
+#define to_string_compact(tokens_) (char * res)to_string_(tokens_, NULL, 0)
+#define to_string_pointer(tokens_, pointer_) (char * res)to_string_(tokens_, pointer_, 0)
 EXPORT unsigned char * res
-to_string_(struct tokens * res tokens, struct token * start, int compact, int incomplete);
+to_string_(struct tokens * res tokens, struct token * start, int compact);
 /* Building */
 EXPORT void start_string(unsigned int *, const unsigned char [STRING_POOL_SIZE]);
 EXPORT void push_string(const unsigned int * res cursor, unsigned char * res pool, char* res string, int length);
@@ -277,6 +280,10 @@ EXPORT void close_root(struct token * res, int * res);
 EXPORT void push_root(int * res, const int * res);
 EXPORT void push_token_kind(enum kind kind, void *res address
                             , struct tokens *tokens, int root_index);
+EXPORT void
+delete(struct token* which);
+EXPORT void
+move(struct cisson_state* state, struct token* which, struct token* where);
 /* EZ JSON */
 EXPORT void
 insert_token(struct cisson_state * state, char *token, struct token* root);

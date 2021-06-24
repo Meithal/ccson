@@ -248,18 +248,21 @@ start_state(struct cisson_state * state, struct token *stack, size_t stack_size,
 EXPORT struct token *
 query_(struct cisson_state * state, size_t length, char query[va_(length)]);
 #define query(state, string) query_((state), cs_strlen(string), (string))
-
+EXPORT int
+index(struct token* stack, struct token* which);
 /* Parsing */
-EXPORT enum json_errors rjson(
+EXPORT enum json_errors
+rjson_(
         size_t len,
-        unsigned char cursor[va_(len)],
+        unsigned char *cursor,
         struct cisson_state * state);
+#define rjson(text, state) rjson_(cs_strlen((text)), (unsigned char*)(text), (state))
 EXPORT enum json_errors
 inject_(size_t len,
        unsigned char text[va_(len)],
        struct cisson_state * state,
        struct token * where);
-#define inject(text, state, where) inject_(cs_strlen((text)), (text), (state), (where))
+#define inject(text, state, where) inject_(cs_strlen((text)), (unsigned char*)(text), (state), (where))
 /* Output */
 #ifdef WANT_LIBC
 EXPORT char* print_debug(struct tokens * );
@@ -267,11 +270,11 @@ EXPORT char* print_debug(struct tokens * );
 #define print_debug(_) ""
 #endif
 
-#define to_string(tokens_) (char * res)to_string_(tokens_, NULL, 2, 0)
-#define to_string_compact(tokens_) (char * res)to_string_(tokens_, NULL, 0, 0)
-#define to_string_pointer(tokens_, pointer_) (char * res)to_string_(tokens_, pointer_, 0, 0)
+#define to_string(tokens_) (char * res)to_string_(tokens_, NULL, 2)
+#define to_string_compact(tokens_) (char * res)to_string_(tokens_, NULL, 0)
+#define to_string_pointer(tokens_, pointer_) (char * res)to_string_(tokens_, pointer_, 0)
 EXPORT unsigned char * res
-to_string_(struct tokens * res tokens, struct token * start, int compact, int incomplete);
+to_string_(struct tokens * res tokens, struct token * start, int compact);
 /* Building */
 EXPORT void start_string(unsigned int *, const unsigned char [STRING_POOL_SIZE]);
 EXPORT void push_string(const unsigned int * res cursor, unsigned char * res pool, char* res string, int length);
@@ -279,6 +282,10 @@ EXPORT void close_root(struct token * res, int * res);
 EXPORT void push_root(int * res, const int * res);
 EXPORT void push_token_kind(enum kind kind, void *res address
                             , struct tokens *tokens, int root_index);
+EXPORT void
+delete(struct token* which);
+EXPORT void
+move(struct cisson_state* state, struct token* which, struct token* where);
 /* EZ JSON */
 EXPORT void
 insert_token(struct cisson_state * state, char *token, struct token* root);
@@ -478,6 +485,7 @@ next_child(struct tokens *  tokens, struct token * root, struct token * current)
 
 EXPORT struct token *
 query_(struct cisson_state * state, size_t length, char query[va_(length)]) {
+    /* todo : unescape ~0, ~1, ~2 */
     size_t i = 0;
     struct token * cursor = &state->tokens.stack[1];
 
@@ -515,9 +523,15 @@ query_(struct cisson_state * state, size_t length, char query[va_(length)]) {
                     if (cs_memcmp(cur->address + 1,
                                   buffer,
                                   token_length + 2) == 0) {
-                        cursor = next_child(&state->tokens,
-                                                 cur,
-                                                 NULL);
+                        if((i + token_length + 1 < length &&
+                            query[i+token_length] == '/' && query[i+token_length+1] == '<')) {
+                            return cur;
+                        }
+                            cursor = next_child(
+                                    &state->tokens,
+                                    cur,
+                                    NULL);
+
                         break;
                     }
                 } while (index--);
@@ -530,6 +544,21 @@ query_(struct cisson_state * state, size_t length, char query[va_(length)]) {
     return cursor;
 }
 
+EXPORT int
+index(struct token* stack, struct token* which) {
+    return (int)(which - stack);
+}
+
+EXPORT void
+delete(struct token* which) {
+    which->root_index = -2;
+}
+
+EXPORT void
+move(struct cisson_state* state, struct token* which, struct token* where) {
+    which->root_index = index(state->tokens.stack, where);
+}
+
 EXPORT enum json_errors
 inject_(size_t len,
        unsigned char text[va_(len)],
@@ -539,16 +568,18 @@ inject_(size_t len,
     int old_root = state->root_index;
     state->root_index = (int)(where - state->tokens.stack);
     state->cur_state = EXPECT_BOM;
-    enum json_errors error = rjson(cs_strlen((char*)text), (unsigned char*)text, state);
+    enum json_errors error = rjson_(
+            cs_strlen((char *) text),
+            (unsigned char *) text, state);
     state->cur_state = old_state;
     state->root_index = old_root;
     return error;
 }
 
 EXPORT enum json_errors
-rjson(size_t len,
-      unsigned char cursor[va_(len)],
-      struct cisson_state * state) {
+rjson_(size_t len,
+       unsigned char *cursor,
+       struct cisson_state * state) {
 
 #define peek_at(where) cursor[where]
 #define SET_STATE_AND_ADVANCE_BY(which_, advance_) \
@@ -1050,7 +1081,7 @@ EXPORT size_t minified_string(unsigned char * target, const unsigned char * sour
 }
 
 EXPORT unsigned char * res
-to_string_(struct tokens * res tokens, struct token * start, int indent, int incomplete) {
+to_string_(struct tokens * res tokens, struct token * start, int indent) {
     // todo: make the caller handle the buffer
 
 #define cat(where, string, token) (\

@@ -26,7 +26,51 @@ one that already exists.
 `query()` lets you target a specific token in the tree using
 the JSON pointer syntax.
 
+`move()` and `delete()` let you manipulate an existing tree.
+
 ## Example
+
+```c
+#define CISSON_IMPLEMENTATION
+#include "cisson.h"
+#include <stdio.h>
+
+int main() {
+    struct cisson_state state = {0};
+    rjson("{\"mon\":[],\"tue\":[]}", &state);
+
+    struct token* mon = query(&state, "/mon");
+    struct token* tue = query(&state, "/tue");
+    char buf[4];
+    int j;
+    for (j = 0; j < 20; j++) {
+        sprintf(buf, "%d", j);
+        insert_token(&state, buf, j % 2 ? mon : tue);
+    }
+
+    stream_into(&state, mon, '+', &(char[]) {"true+false"});
+    inject("[1, 2, 3]", &state, query(&state, "/tue"));
+
+    puts(to_string(&state.tokens));
+    assert(strcmp(
+            to_string_compact(&state.tokens), 
+            "{\"mon\":[1,3,5,7,9,11,13,15,17,19,true,false],\"tue\":[0,2,4,6,8,10,12,14,16,18,[1,2,3]]}"
+            ) == 0);
+    }
+```
+
+`rjson` reads raw JSON and converts it to a cisson tree object.
+
+`inject` reads raw JSON, and injects it in an existing tree, at
+the place pointed by the third argument.
+
+`query` uses a JSON pointer
+(see [RFC 6901](https://datatracker.ietf.org/doc/html/rfc6901))
+to fetch a token from the JSON tree. It is extended to allow
+targeting keys themselves.
+
+`to_string` and `to_string_compact` convert a cisson tree into
+JSON text.
 
 ```c
 #define CISSON_IMPLEMENTATION
@@ -105,57 +149,6 @@ tokens separated by the separator. The stream must be writeable.
 You can mix `stream_tokens`, `push_tokens` and macros to
 build a JSON object.
 
-***
-
-To convert the JSON `{"foo":"bar","array":[1,2,4],"question":true}`
-to a C object
-
-```c
-#define CISSON_IMPLEMENTATION
-#include "cisson.h"
-#include <stdio.h> 
-#include <string.h> 
-
-int main(void) {
-    struct foo {
-        char * foo;
-        int array[3];
-        bool question;
-    };
-    
-    struct foo foo = { 0 };
-    
-    char * json = "{\"foo\":\"bar\",\"array\":[1,2,4],\"question\":true}"
-            
-    struct cisson_state state;
-    struct token stack[0x200];
-    char pool[0x200];
-
-    enum json_errors error = rjson(strlen(json), json, &state);
-    
-    if (error != JSON_ERROR_NO_ERRORS) {
-        puts(json_errors[error]);
-        return 1;
-    }
-    
-    foo.foo = query(&state, "/foo").address;
-    sscanf(query(&state, "/array/0").address, "%d", &foo.array[0]);
-    sscanf(query(&state, "/array/1").address, "%d", &foo.array[1]);
-    sscanf(query(&state, "/array/2").address, "%d", &foo.array[2]);
-    foo.question = query(&state, "/array/2").kind == TRUE ? true: false;
-    
-    assert(memcmp((struct foo){.foo = foo.foo, .array={1, 2, 4}, .question=true}, foo, sizeof foo) == 0);
-}
-```
-
-`rjson` reads raw JSON and converts it to a cson object.
-
-`query` uses a JSON pointer 
-(see [RFC 6901](https://datatracker.ietf.org/doc/html/rfc6901)) 
-to fetch a token from the JSON tree. A token has an `.address` 
-property that points to the string associated with the token. 
-It also has a `.kind` property.
-
-We used our own pool of memory instead of using the 
-shared static one, since our object will point to it, 
-and we don't want to lose the value we point on.
+`start_state()` let you customize the memory your cisson tree
+will work with and print to, by default every json tree
+uses the same static memory.
