@@ -285,8 +285,8 @@ delete(struct token* which);
 EXPORT void
 move(struct cisson_state* state, struct token* which, struct token* where);
 EXPORT void
-srename_(struct cisson_state* state, struct token* which, int len, char* new_name);
-#define srename(state, which, new_name) srename_(state, which, cs_strlen(new_name), new_name)
+rename_string_(struct cisson_state* state, struct token* which, int len, char* new_name);
+#define rename_string(state, which, new_name) rename_string_(state, which, cs_strlen(new_name), new_name)
 /* EZ JSON */
 EXPORT void
 insert_token(struct cisson_state * state, char *token, struct token* root);

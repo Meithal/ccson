@@ -225,7 +225,7 @@ move(struct cisson_state* state, struct token* which, struct token* where) {
 }
 
 EXPORT void
-srename_(struct cisson_state* state, struct token* which, int len, char* new_name) {
+rename_string_(struct cisson_state* state, struct token* which, int len, char* new_name) {
     START_STRING(state);
     PUSH_STRING(state, "\"", 1);
     PUSH_STRING(state, new_name, len);

@@ -158,7 +158,7 @@ int main() {
     inject(to_string_pointer( &state, query(&state, "/3")), &state2,
         query(&state2, "/array/<"));
     delete(query(&state, "/3"));
-    srename(&state2, query(&state2, "/foo/<"), "bar");
+    rename_string(&state2, query(&state2, "/foo/<"), "bar");
     
     puts(to_string_compact(&state.tokens));
     puts(to_string_compact(&state2.tokens));
@@ -195,7 +195,7 @@ to target the string token itself, and not the value it leads to
 We then `delete` the array we moved from the first state,
 so its state is now `[1,3,[4,5,6]]`.
 
-We then `srename` the string `"foo"` to `"bar"` in the second
+We then `rename_string` the string `"foo"` to `"bar"` in the second
 state. This way is more efficient than creating a new string,
 delete the previous one and, make its children point on the new
 string and inject it inplace of the ancient one.

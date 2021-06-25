@@ -558,7 +558,7 @@ int main(int argc, char** argv) {
     inject(to_string_pointer( &state, query(&state, "/3")), &state2,
            query(&state2, "/array/<"));
     delete(query(&state, "/3"));
-    srename(&state2, query(&state2, "/foo/<"), "bar");
+    rename_string(&state2, query(&state2, "/foo/<"), "bar");
 
     puts(to_string_compact(&state.tokens));
     puts(to_string_compact(&state2.tokens));

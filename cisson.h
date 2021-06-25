@@ -133,7 +133,7 @@ struct token {
 
 /**
  * Json structures are stored as a flat array of objects holding
- * a link to their parent whose value is their index in that array, aindex zero being the root
+ * a link to their parent whose value is their index in that array, index zero being the root
  * Json doesn't require json arrays elements to have an order so sibling data is not stored.
  */
 
@@ -287,8 +287,8 @@ delete(struct token* which);
 EXPORT void
 move(struct cisson_state* state, struct token* which, struct token* where);
 EXPORT void
-srename_(struct cisson_state* state, struct token* which, int len, char* new_name);
-#define srename(state, which, new_name) srename_(state, which, cs_strlen(new_name), new_name)
+rename_string_(struct cisson_state* state, struct token* which, int len, char* new_name);
+#define rename_string(state, which, new_name) rename_string_(state, which, cs_strlen(new_name), new_name)
 /* EZ JSON */
 EXPORT void
 insert_token(struct cisson_state * state, char *token, struct token* root);
@@ -563,7 +563,7 @@ move(struct cisson_state* state, struct token* which, struct token* where) {
 }
 
 EXPORT void
-srename_(struct cisson_state* state, struct token* which, int len, char* new_name) {
+rename_string_(struct cisson_state* state, struct token* which, int len, char* new_name) {
     START_STRING(state);
     PUSH_STRING(state, "\"", 1);
     PUSH_STRING(state, new_name, len);
