@@ -15,24 +15,6 @@ The preprocessor will copy `cisson.h` in your file, and
 there is nothing more to do on your side. You must define
 `CISSON_IMPLEMENTATION` only once in all your code base.
 
-## Usage
-`rjson()` reads JSON and turns it into a cisson object
-(a tree of tokens). `inject()` reads raw JSON and
-injects it into an existing tree.
-
-`to_string()` turns a cisson tree object into JSON text.
-`to_string_pointer()` extracts a subpart of the tree and turns
-it into JSON text.
-
-`push_token()`, `insert_token()`, `stream_tokens()` and
-`stream_into()` let you build a cisson tree from scratch, 
-or manipulate one that already exists. 
-
-`query()` lets you target a specific token in the tree using
-the JSON pointer syntax.
-
-`move()` and `delete()` let you manipulate an existing tree.
-
 ## Examples
 
 ```c
