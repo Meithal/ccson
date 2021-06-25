@@ -210,7 +210,7 @@ query_(struct cisson_state * state, size_t length, char query[va_(length)]) {
 }
 
 EXPORT int
-index(struct token* stack, struct token* which) {
+aindex(struct token* stack, struct token* which) {
     return (int)(which - stack);
 }
 
@@ -221,8 +221,18 @@ delete(struct token* which) {
 
 EXPORT void
 move(struct cisson_state* state, struct token* which, struct token* where) {
-    which->root_index = index(state->tokens.stack, where);
+    which->root_index = aindex(state->tokens.stack, where);
 }
+
+EXPORT void
+srename_(struct cisson_state* state, struct token* which, int len, char* new_name) {
+    START_STRING(state);
+    PUSH_STRING(state, "\"", 1);
+    PUSH_STRING(state, new_name, len);
+    PUSH_STRING(state, "\"", 1);
+    which->address = state->strings.pool + state->strings.cursor;
+}
+
 
 EXPORT enum json_errors
 inject_(size_t len,

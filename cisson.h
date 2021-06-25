@@ -18,7 +18,7 @@
 #define va_(val)
 #endif
 
-#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
+#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L && !defined(FORCE_ANSI)
 #define c99
 #define res restrict
 #else
@@ -133,7 +133,7 @@ struct token {
 
 /**
  * Json structures are stored as a flat array of objects holding
- * a link to their parent whose value is their index in that array, index zero being the root
+ * a link to their parent whose value is their index in that array, aindex zero being the root
  * Json doesn't require json arrays elements to have an order so sibling data is not stored.
  */
 
@@ -249,7 +249,7 @@ EXPORT struct token *
 query_(struct cisson_state * state, size_t length, char query[va_(length)]);
 #define query(state, string) query_((state), cs_strlen(string), (string))
 EXPORT int
-index(struct token* stack, struct token* which);
+aindex(struct token* stack, struct token* which);
 /* Parsing */
 EXPORT enum json_errors
 rjson_(
@@ -272,7 +272,7 @@ EXPORT char* print_debug(struct tokens * );
 
 #define to_string(tokens_) (char * res)to_string_(tokens_, NULL, 2)
 #define to_string_compact(tokens_) (char * res)to_string_(tokens_, NULL, 0)
-#define to_string_pointer(tokens_, pointer_) (char * res)to_string_(tokens_, pointer_, 0)
+#define to_string_pointer(state_, pointer_) (char * res)to_string_(&(state_)->tokens, pointer_, 0)
 EXPORT unsigned char * res
 to_string_(struct tokens * res tokens, struct token * start, int compact);
 /* Building */
@@ -286,6 +286,9 @@ EXPORT void
 delete(struct token* which);
 EXPORT void
 move(struct cisson_state* state, struct token* which, struct token* where);
+EXPORT void
+srename_(struct cisson_state* state, struct token* which, int len, char* new_name);
+#define srename(state, which, new_name) srename_(state, which, cs_strlen(new_name), new_name)
 /* EZ JSON */
 EXPORT void
 insert_token(struct cisson_state * state, char *token, struct token* root);
@@ -545,7 +548,7 @@ query_(struct cisson_state * state, size_t length, char query[va_(length)]) {
 }
 
 EXPORT int
-index(struct token* stack, struct token* which) {
+aindex(struct token* stack, struct token* which) {
     return (int)(which - stack);
 }
 
@@ -556,8 +559,18 @@ delete(struct token* which) {
 
 EXPORT void
 move(struct cisson_state* state, struct token* which, struct token* where) {
-    which->root_index = index(state->tokens.stack, where);
+    which->root_index = aindex(state->tokens.stack, where);
 }
+
+EXPORT void
+srename_(struct cisson_state* state, struct token* which, int len, char* new_name) {
+    START_STRING(state);
+    PUSH_STRING(state, "\"", 1);
+    PUSH_STRING(state, new_name, len);
+    PUSH_STRING(state, "\"", 1);
+    which->address = state->strings.pool + state->strings.cursor;
+}
+
 
 EXPORT enum json_errors
 inject_(size_t len,

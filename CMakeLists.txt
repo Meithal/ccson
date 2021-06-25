@@ -87,4 +87,9 @@ if(CISSON_WANT_LIBC)
     add_compile_definitions("WANT_LIBC")
 endif()
 
+option(CISSON_FORCE_ANSI "Force ANSI." OFF)
+if(CISSON_FORCE_ANSI)
+    add_compile_definitions("FORCE_ANSI")
+endif()
+
 set(CMAKE_C_STANDARD_LIBRARIES "")

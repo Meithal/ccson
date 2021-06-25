@@ -501,18 +501,19 @@ int main(int argc, char** argv) {
     fflush(stdout);
     puts("\n\n*** POINTERS ***");
 
-    puts(to_string_pointer(&state.tokens, query(&state, "/foo")));
-    assert(strcmp(to_string_pointer(&state.tokens, query(&state, "/foo")), "\"bar\"") == 0);
+    puts(to_string_pointer(&state, query(&state, "/foo")));
+    assert(strcmp(to_string_pointer(&state, query(&state, "/foo")), "\"bar\"") == 0);
 
-    puts(to_string_pointer(&state.tokens, query(&state, "/array/2")));
-    assert(strcmp(to_string_pointer(&state.tokens, query(&state, "/array/2")), "4") == 0);
+    puts(to_string_pointer(&state, query(&state, "/array/2")));
+    assert(strcmp(to_string_pointer(&state, query(&state, "/array/2")), "4") == 0);
 
-    puts(to_string_pointer(&state.tokens, query(&state, "/")));
-    assert(strcmp(to_string_pointer(&state.tokens, query(&state, "/")), "null") == 0);
+    puts(to_string_pointer(&state, query(&state, "/")));
+    assert(strcmp(to_string_pointer(&state, query(&state, "/")), "null") == 0);
 
-    puts(to_string_pointer(&state.tokens, query(&state, "")));
-    assert(strcmp(to_string_pointer(&state.tokens, query(&state, "")), "{\"foo\":\"bar\",\"array\":[1,2,4],\"question\":true,\"\":null}") == 0);
+    puts(to_string_pointer(&state, query(&state, "")));
+    assert(strcmp(to_string_pointer(&state, query(&state, "")), "{\"foo\":\"bar\",\"array\":[1,2,4],\"question\":true,\"\":null}") == 0);
     fflush(stdout);
+
     puts("\n\n*** EDITION ***");
 
     memset(&state, 0, sizeof state);
@@ -537,6 +538,31 @@ int main(int argc, char** argv) {
     fflush(stdout);
     assert(strcmp(to_string_compact(&state.tokens), "{\"tue\":[0,2,4,6,8,10,12,14,16,18,[1,2,3]],\"fri\":[1,3,5,7,9,11,13,15,17,19,true,false]}") == 0);
 
+    puts("\n\n*** TWO TREES ***");
+
+    memset(&state, 0, sizeof state);
+    struct cisson_state state2 = { 0 };
+
+    struct token stack1[40];
+    struct token stack2[40];
+    unsigned char pool1[400];
+    unsigned char pool2[400];
+
+    start_state(&state, stack1, sizeof stack1, pool1, sizeof pool1);
+    start_state(&state2, stack2, sizeof stack2, pool2, sizeof pool2);
+    rjson("[1, 2, 3, [4, 5, 6], [7, 8, 9]", &state);
+    rjson("{\"foo\": 1}", &state2);
+
+    insert_token(&state2, "\"array\"", query(&state2, ""));
+    move(&state, query(&state, "/1"), query(&state, "/4"));
+    inject(to_string_pointer( &state, query(&state, "/3")), &state2,
+           query(&state2, "/array/<"));
+    delete(query(&state, "/3"));
+    srename(&state2, query(&state2, "/foo/<"), "bar");
+
+    puts(to_string_compact(&state.tokens));
+    puts(to_string_compact(&state2.tokens));
+
 #ifndef HAS_VLA
     printf("Total parsing time: %lld\n", total_parse_time);
     printf("Total Writing time: %lld\n", total_write_time);
@@ -555,6 +581,7 @@ int main(int argc, char** argv) {
             LAST_COMMIT_COUNT, CMAKE_GENERATOR);
     fclose(file);
 #endif
+
 
     return 0;
 }

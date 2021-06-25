@@ -16,7 +16,7 @@
 #define va_(val)
 #endif
 
-#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
+#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L && !defined(FORCE_ANSI)
 #define c99
 #define res restrict
 #else
@@ -247,7 +247,7 @@ EXPORT struct token *
 query_(struct cisson_state * state, size_t length, char query[va_(length)]);
 #define query(state, string) query_((state), cs_strlen(string), (string))
 EXPORT int
-index(struct token* stack, struct token* which);
+aindex(struct token* stack, struct token* which);
 /* Parsing */
 EXPORT enum json_errors
 rjson_(
@@ -270,7 +270,7 @@ EXPORT char* print_debug(struct tokens * );
 
 #define to_string(tokens_) (char * res)to_string_(tokens_, NULL, 2)
 #define to_string_compact(tokens_) (char * res)to_string_(tokens_, NULL, 0)
-#define to_string_pointer(tokens_, pointer_) (char * res)to_string_(tokens_, pointer_, 0)
+#define to_string_pointer(state_, pointer_) (char * res)to_string_(&(state_)->tokens, pointer_, 0)
 EXPORT unsigned char * res
 to_string_(struct tokens * res tokens, struct token * start, int compact);
 /* Building */
@@ -284,6 +284,9 @@ EXPORT void
 delete(struct token* which);
 EXPORT void
 move(struct cisson_state* state, struct token* which, struct token* where);
+EXPORT void
+srename_(struct cisson_state* state, struct token* which, int len, char* new_name);
+#define srename(state, which, new_name) srename_(state, which, cs_strlen(new_name), new_name)
 /* EZ JSON */
 EXPORT void
 insert_token(struct cisson_state * state, char *token, struct token* root);
