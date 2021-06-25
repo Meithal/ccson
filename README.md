@@ -265,6 +265,5 @@ memory to use as default token stack and string pool. If
 you don't define this, you can then define `STRING_POOL_SIZE`
 and `MAX_TOKENS` to define their respective sizes.
 
-The support of modern C (after the 1999 standard) is detected
-automatically. You can force the compilation in 89/90 ANSI
-C mode by defining `FORCE_ANSI`.
+`FORCE_ANSI` fores the code to look like ANSI C, even
+if your compiler can support more recent versions of C.
