@@ -622,7 +622,6 @@ rjson_(size_t len,
     // todo: pedantic mode? (forbid duplicate keys, enforce order, cap integer values to INT_MAX...)
     // todo: test for overflows
     // fixme: check for bounds
-    // todo: example with slowly filled array
     // todo: no memory move mode (simple tokenizer)
     // todo: implement JSON pointer RFC6901
     // todo: implement JSON schema

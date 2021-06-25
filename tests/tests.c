@@ -563,6 +563,10 @@ int main(int argc, char** argv) {
     puts(to_string_compact(&state.tokens));
     puts(to_string_compact(&state2.tokens));
 
+    assert(strcmp(to_string_compact(&state.tokens), "[1,3,[4,5,6]]") == 0);
+    assert(strcmp(to_string_compact(&state2.tokens), "{\"bar\":1,\"array\":[7,8,9,2]}") == 0);
+
+
 #ifndef HAS_VLA
     printf("Total parsing time: %lld\n", total_parse_time);
     printf("Total Writing time: %lld\n", total_write_time);

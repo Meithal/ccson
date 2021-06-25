@@ -1,5 +1,6 @@
-Cisson is a JSON library in C. It serializes C objects
-into JSON and parses JSON into C objects.
+Cisson is a JSON library in C. It parses JSON into an abstract
+tree and serializes trees into JSON. It lets you manipulate 
+trees in various ways.
 
 ## Requirements
 Tested with GCC and MSVC.
@@ -11,7 +12,8 @@ Used single-header
 #include "cisson.h"
 ```
 The preprocessor will copy `cisson.h` in your file, and
-there is nothing more to do on your side.
+there is nothing more to do on your side. You must define
+`CISSON_IMPLEMENTATION` only once in all your code base.
 
 ## Usage
 `rjson()` reads JSON and turns it into a cisson object
@@ -19,6 +21,8 @@ there is nothing more to do on your side.
 injects it into an existing tree.
 
 `to_string()` turns a cisson tree object into JSON text.
+`to_string_pointer()` extracts a subpart of the tree and turns
+it into JSON text.
 
 `push_token()`, `insert_token()`, `stream_tokens()` and
 `stream_into()` let you build a cisson tree from scratch, 
@@ -70,55 +74,6 @@ targeting keys themselves.
 `to_string` and `to_string_compact` convert a cisson tree into
 JSON text.
 
-```c
-#define CISSON_IMPLEMENTATION
-#include "cisson.h"
-#include <stdio.h>
-
-int main() {
-    struct cisson_state state = {0};
-    
-    /* cisson has a static stack of tokens and a static pool
-     * of characters where the token contents will be copied to.
-     * You can use your own stack and pool if you plan to 
-     * have more than one cisson object in memory at any time. */
-
-    push_token(&state, "#smart root"); /* only the leading # is necessary to signal a document root */
-    push_token(&state, "{");
-    push_token(&state, "\"foo\"");
-    push_token(&state, ":");
-    push_token(&state, "\"bar\"");
-    push_token(&state, ">");
-    push_token(&state, "\"array\"");
-    push_token(&state, ":");
-    push_token(&state, "[");
-    push_token(&state, "1");
-    push_token(&state, "2");
-    push_token(&state, "4");
-    push_token(&state, ">>");
-    push_token(&state, "\"question\"");
-    push_token(&state, ":");
-    push_token(&state, "true");
-    puts(to_string_compact(&state.tokens)); /* {"foo":"bar","array":[1,2,4],"question":true} */
-
-}
-```
-Every token has a root that it binds to. The state keeps
-in memory what the current root is, for example if the current root
-is an array, every token we push will be a value of this array.
-This allows to resume the building of the JSON tree at any time.
-
-Array elements have as root their array;
-Object properties have as root their object;
-The values associated to object properties have as root that
-very property. 
-
-When we meet any of these characters `{`, `[`, `:`, `#`
-, we change the root the next tokens will have their root as. 
-When meeting `>`, the current root will become what the root of the
-current root was, hence going back in the
-hierarchy of roots by one notch. The nature of the root
-we close doesn't matter, so we use a generic character. 
 
 Cisson only accepts string values, you must convert your non-string
 values before they can be tokenized; by using `sprintf` for example.
@@ -160,8 +115,8 @@ int main() {
     delete(query(&state, "/3"));
     rename_string(&state2, query(&state2, "/foo/<"), "bar");
     
-    puts(to_string_compact(&state.tokens));
-    puts(to_string_compact(&state2.tokens));
+    puts(to_string_compact(&state.tokens)); /* [1,3,[4,5,6]] */
+    puts(to_string_compact(&state2.tokens)); /* {"bar":1,"array":[7,8,9,2]} */
 
 }
 ```
@@ -209,7 +164,7 @@ token point to it.
 
 Values of a tree that are expected to often change should
 be extracted to a native type (int, float...), then injected
-in the tree once you are sure it won't change anymore.
+in the tree once you actually need there an up-to-date value.
 
 Extracting more tokens than the token stack can hold
 has undefined behavior. Any value will generate a token, those
@@ -244,6 +199,10 @@ Those functions have an underscore suffix.
 If you need to handle binary safe strings, use those 
 functions directly.
 
+### Nesting
+Does not involve recursion, can parse nested objects as deep 
+as INT_MAX.
+
 ### Duplicate keys, ordering
 Object keys can have duplicate names. 
 
@@ -254,7 +213,8 @@ inserted on the token stack. There is no way to specify
 where you want to insert an element inside an array.
 
 ## Preprocessor options
-`WANT_LIBC` includes the standard C library. 
+`WANT_LIBC` includes the standard C library instead of
+using drop-in replacement functions. 
 
 `WANT_JSON1` gives  the option to parse a JSON string
 in the first standard way, that allowed only arrays and 
