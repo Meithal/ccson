@@ -3,17 +3,17 @@ tree and serializes trees into JSON. It lets you manipulate
 trees in various ways.
 
 ## Features
-* Compiles in ANSI C mode, tested with GCC and MSVC.
+* Compiles in ANSI C, tested with GCC and MSVC.
 * Supports 100% of JSON, ~200 tests cover every branch.
   Sticks strictly to the standard, with no leniency.
 * Comes as a single-header file, or two separate files
 having each the header and the implementation.
-* Has no dependencies on libC, could be used in barebone
-  environments.
+* Has no dependency on libC, could be 
+  used in bare-bones environments.
 * You must manage the memory yourself, the library doesn't allocate memory.
   It treats that memory as a stack, which means minimal fragmentation
 and no random accesses during the processing of trees and texts.
-* Stack overflow free as no recursion happens.
+* Stack overflow can't happen as no recursion happens.
 * Provides many convenience functions to modify abstract trees
   and to create json documents from scratch, or extract
   only targeted sections of JSON text.
