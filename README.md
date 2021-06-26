@@ -2,8 +2,30 @@ Cisson is a JSON library in C. It parses JSON into an abstract
 tree and serializes trees into JSON. It lets you manipulate 
 trees in various ways.
 
+## Features
+* Compiles in ANSI C mode, tested with GCC and MSVC.
+* Supports 100% of JSON, ~200 tests cover every branch.
+  Sticks strictly to the standard, with no leniency.
+* Comes as a single-header file, or two separate files
+having each the header and the implementation.
+* Has no dependencies on libC, could be used in barebone
+  environments.
+* You must manage the memory yourself, the library doesn't allocate memory.
+  It treats that memory as a stack, which means minimal fragmentation
+and no random accesses during the processing of trees and texts.
+* Stack overflow free as no recursion happens.
+* Provides many convenience functions to modify abstract trees
+  and to create json documents from scratch, or extract
+  only targeted sections of JSON text.
+* Won't tamper with data and won't lead to loss of data.
+If your text has unicode encoding errors, it will stay intact
+  (no substitution of characters with `?` or `�` symbols).
+  Allows duplicate keys in objects with no risk of deletion.
+
 ## Requirements
-Tested with GCC and MSVC.
+You need a C compiler, tested with GCC and MSVC. Support
+for [Cmake](https://cmake.org/) is provided, you must have
+it installed to the version 3.14 minimum to use cmake features.
 
 ## Install
 Used single-header
@@ -12,7 +34,8 @@ Used single-header
 #include "cisson.h"
 ```
 The preprocessor will copy `cisson.h` in your file, and
-there is nothing more to do on your side. You must define
+there is nothing more to do on your side. You can include
+cisson.h as many times as you want, but you must define
 `CISSON_IMPLEMENTATION` only once in all your code base.
 
 ## Examples
@@ -107,7 +130,7 @@ can't share the same pool, we create our own
 custom pools and stacks and signal our states that they have
 to use them with `start_state`. 
 
-`start_state()` let you customize the memory your cisson tree
+`start_state()` let you customize the memory your json tree
 will work with and print to, by default every json tree
 uses the same static memory.
 
@@ -166,8 +189,8 @@ respective size, stored by default in an
 `unsigned char`.
 
 ### Thread safety
-The library is not thread safe but can be if you provide
-yourself the memory your trees work with.
+The library is thread safe only if you allocate yourself
+the memory each tree uses.
 
 ### Encoding
 Only UTF-8 (with optional BOM) is supported. Encoding errors
@@ -181,9 +204,10 @@ Those functions have an underscore suffix.
 If you need to handle binary safe strings, use those 
 functions directly.
 
-### Nesting
-Does not involve recursion, can parse nested objects as deep 
-as INT_MAX.
+### Memory safe
+Can parse nested objects as deep as INT_MAX, no risk of
+stack overflows from extremely nested objects. Won't malloc,
+so no memory leaks.
 
 ### Duplicate keys, ordering
 Object keys can have duplicate names. 
@@ -195,17 +219,17 @@ inserted on the token stack. There is no way to specify
 where you want to insert an element inside an array.
 
 ## Preprocessor options
-`WANT_LIBC` includes the standard C library instead of
-using drop-in replacement functions. 
-
-`WANT_JSON1` gives  the option to parse a JSON string
+* `WANT_LIBC` includes the standard C library instead of
+using drop-in replacement functions.
+  
+* `WANT_JSON1` gives  the option to parse a JSON string
 in the first standard way, that allowed only arrays and 
 objects as topmost values.
-
-`SELF_MANAGE_MEMORY` prevents the library to allocate static
+  
+* `SELF_MANAGE_MEMORY` prevents the library to allocate static
 memory to use as default token stack and string pool. If
 you don't define this, you can then define `STRING_POOL_SIZE`
 and `MAX_TOKENS` to define their respective sizes.
-
-`FORCE_ANSI` fores the code to look like ANSI C, even
+  
+* `FORCE_ANSI` fores the code to look like ANSI C, even
 if your compiler can support more recent versions of C.
