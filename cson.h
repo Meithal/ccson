@@ -6,6 +6,7 @@
 #ifdef WANT_LIBC
 #include<stdio.h>
 #include<string.h>
+#include <uchar.h>
 #endif
 
 #if (!(defined(_WIN32) || defined(_WIN64)) \
@@ -159,6 +160,7 @@ struct token {
   X(JSON_ERROR_UTF16_NOT_SUPPORTED_YET, "Code points greater than 0x0800 not supported yet.") \
   X(JSON_ERROR_INCOMPLETE_UNICODE_ESCAPE, "Incomplete unicode character sequence.") \
   X(JSON_ERROR_UNESCAPED_CONTROL, "Control characters must be escaped.") \
+  X(JSON_ERROR_UNICODE_ERROR, "Failed to decode unicode codepoint.") \
 
 #define X(a, b) a,
 enum whitespace_tokens { WHITESPACE };
@@ -187,6 +189,8 @@ static char digit_starters[] = "-0123456789";
 static char digits[] = "0123456789";
 static char digits19[] = "123456789";
 static char hexdigits[] = "0123456789abcdefABCDEF";
+static char newline[] = "\r\n";
+static char whitespace_wo_newline[] = "\t ";
 
 enum states {
     EXPECT_BOM,
@@ -194,7 +198,6 @@ enum states {
     AFTER_VALUE,
     OPEN_ARRAY,
     OPEN_ASSOC,
-    FOUND_OPEN_QUOTE,
     LITERAL_ESCAPE,
     IN_STRING,
     START_NUMBER,
@@ -211,19 +214,27 @@ enum states {
     ASSOC_EXPECT_KEY,
     CLOSE_STRING,
     ASSOC_EXPECT_COLON,
-    ASSOC_AFTER_INNER_VALUE
+    ASSOC_AFTER_INNER_VALUE,
+    IN_BARE_STRING,
+    IN_COMMENT,
+    IN_SQUOTED_STRING,
+    IN_VERBATIM_STRING,
+    LOOK_FOR_VERBATIM_CONT,
 };
 
-#ifdef WANT_JSON1
 enum json_mode {
     JSON2,
     JSON1,
     RELAXED,
+    CSON
 };
-#endif
 
 static struct token static_stack[MAX_TOKENS] = { 0 };
 static unsigned char static_pool[STRING_POOL_SIZE] = { 0 };
+
+#define string_size_type_raw unsigned short int
+#define string_size_type (string_size_type_raw)
+#define tok_len(address) ((address) - sizeof string_size_type)
 
 struct tree {
     enum states cur_state;
@@ -236,12 +247,13 @@ struct tree {
         unsigned char *pool;
         unsigned int cursor;
     } strings;
-#ifdef WANT_JSON1
     enum json_mode mode;
-#endif
 };
 
 
+/* cson exclusive */
+EXPORT char *
+cson_to_json(char* cson, unsigned char* sink, int sink_size);
 /* State maintenance */
 EXPORT void
 start_state(struct tree * state, struct token *stack, size_t stack_size, unsigned char *pool, size_t pool_size);
@@ -270,11 +282,12 @@ EXPORT char* print_debug(struct tokens * );
 #define print_debug(_) ""
 #endif
 
-#define to_string(tokens_) (char * res)to_string_(tokens_, NULL, 2)
-#define to_string_compact(tokens_) (char * res)to_string_(tokens_, NULL, 0)
-#define to_string_pointer(state_, pointer_) (char * res)to_string_(&(state_)->tokens, pointer_, 0)
+#define to_string(tokens_) (char * res)to_string_(tokens_, NULL, 2, NULL, -1)
+#define to_string_compact(tokens_) (char * res)to_string_(tokens_, NULL, 0, NULL, -1)
+#define to_string_pointer(state_, pointer_) (char * res)to_string_(&(state_)->tokens, pointer_, 0, NULL, -1)
+#define to_string_sink(state_, sink, size) (char * res)to_string_(&(state_)->tokens, NULL, 2, sink, size)
 EXPORT unsigned char * res
-to_string_(struct tokens * res tokens, struct token * start, int compact);
+to_string_(struct tokens * res tokens, struct token * start, int compact, unsigned char* sink, int sink_size);
 /* Building */
 EXPORT void start_string(unsigned int *, const unsigned char [STRING_POOL_SIZE]);
 EXPORT void push_string(const unsigned int * res cursor, unsigned char * res pool, char* res string, int length);
@@ -336,7 +349,22 @@ stream_tokens_(struct tree * state, struct token * where, char separator, char *
 /* Stripped header guard. */
 
 #endif // JSON_JSON_H /* Automatically added header guard. */
-#ifdef CISSON_IMPLEMENTATION
+#ifdef CSON_IMPLEMENTATION>
+#include "json.h"
+
+
+EXPORT char *
+cson_to_json(char* cson, unsigned char* sink, int sink_size) {
+    struct tree tree = { 0 };
+    start_state(&tree, static_stack, sizeof static_stack,
+                static_pool, sizeof static_pool);
+    tree.mode = CSON;
+    enum json_errors err = rjson(cson, &tree);
+    if (err != JSON_ERROR_NO_ERRORS) {
+        return (char*)json_errors[err];
+    }
+    return to_string_sink(&tree, sink, sink_size);
+}
 
 static inline size_t
 in(char* res hay, unsigned char needle) {
@@ -349,12 +377,17 @@ in(char* res hay, unsigned char needle) {
 }
 
 static inline size_t
-len_whitespace(unsigned char * res string) {
+len_in(char* hay, unsigned char* cursor) {
     int count = 0;
-    while(in(whitespaces, string[count])) {
+    while(in(hay, cursor[count])) {
         count++;
     }
     return count;
+}
+
+static inline size_t
+len_whitespace(unsigned char * res string) {
+    return len_in(whitespaces, string);
 }
 
 static inline size_t
@@ -362,10 +395,63 @@ remaining(unsigned char * res max, unsigned char * res where) {
     return max - where;
 }
 
+static inline size_t
+unicode_codepoint(char* stream, size_t max_len, size_t *consumed) {
+    mbstate_t mb = { 0 };
+    char32_t codepoint;
+
+    size_t inlen;
+    while ((inlen = mbrtoc32(&codepoint, stream + *consumed, max_len - *consumed, &mb))) {
+        if((int)inlen ==-2) {
+            *consumed += 1;
+        } else {
+            *consumed += inlen;
+            break;
+        }
+        if(inlen == (size_t)-3 || inlen == (size_t)-1) {
+            return -1;
+        }
+    }
+
+    return codepoint;
+}
+
+static inline _Bool is_bare_name_starter(char32_t codepoint) {
+    return  codepoint == 0x24 || /* $ */
+    codepoint == 0x2D || /* - */
+    codepoint >= 0x41 && codepoint <= 0x51 || /* A to Z */
+    codepoint == 0x5F || /* _ */
+    codepoint >= 0x61 && codepoint <= 0x7A || /* a to z */
+    codepoint == 0xAA || /* ª */
+    codepoint == 0xB5 || /* µ */
+    codepoint == 0xBA || /* º */
+    codepoint >= 0xC0 && codepoint <= 0xD6 || /* À to Ö */
+    codepoint >= 0xD8 && codepoint <= 0xF6 || /* Ø to ö */
+    codepoint >= 0xF8 && codepoint <= 0x2FF || /* ø to ˿ */
+    codepoint >= 0x370 && codepoint <= 0x37D || /* Ͱ to ͽ */
+    codepoint >= 0x37F && codepoint <= 0x1FFF || /* until sized spaces */
+    codepoint >= 0x200C && codepoint <= 0x200D || /* zero width joiner and non joiner */
+    codepoint >= 0x2070 && codepoint <= 0x218F || /* until arrows */
+    codepoint >= 0x2C00 && codepoint <= 0x2FEF ||
+    codepoint >= 0x3001 && codepoint <= 0xD7FF || /* until surrogates */
+    codepoint >= 0xF900 && codepoint <= 0xFDCF || /* except variations */
+    codepoint >= 0xFDF0 && codepoint <= 0xFFFD || /* exclude arabic controls */
+    codepoint >= 0x10000 && codepoint <= 0xEFFFF; /* all the rest of unicode */
+}
+
+static inline _Bool is_bare_name_middle(char32_t codepoint) {
+    return is_bare_name_starter(codepoint) ||
+    codepoint == 0x2E || /* . */
+    codepoint >= 0x30 && codepoint <= 0x39  || /* 0 to 9 */
+    codepoint == 0xB7 || /* · */
+    codepoint >= 0x300 && codepoint <= 0x036F || /* combining diacritic marks */
+    codepoint >= 0x203F && codepoint <= 0x2040; /* ‿ and ⁀ */
+}
+
 EXPORT void
 start_string(unsigned int * res cursor,
              const unsigned char pool[STRING_POOL_SIZE]) {
-    *cursor += pool[*cursor] + 1;
+    *cursor += pool[*cursor] + sizeof string_size_type;
 }
 
 EXPORT void
@@ -376,7 +462,7 @@ push_string(const unsigned int *cursor,
     /* todo: memmove if we insert */
     /* todo: support strings longer than 256 characters */
     cs_memcpy(
-            pool + *cursor + 1 + pool[*cursor],
+            pool + *cursor + sizeof string_size_type + pool[*cursor],
             string,
             length);
     pool[*cursor] += length;
@@ -523,7 +609,7 @@ query_(struct tree * state, size_t length, char query[va_(length)]) {
                 struct token * cur = NULL;
                 do {
                     cur = next_child(&state->tokens, cursor, cur);
-                    if (cs_memcmp(cur->address + 1,
+                    if (cs_memcmp(cur->address + sizeof string_size_type,
                                   buffer,
                                   token_length + 2) == 0) {
                         if((i + token_length + 1 < length &&
@@ -646,7 +732,13 @@ rjson_(size_t len,
                 if (peek_at(len_whitespace(cursor)+0) == '"') {
                     START_STRING(state);
                     PUSH_STRING(state, (char[]) {peek_at(len_whitespace(cursor) + 0)}, 1);
-                    SET_STATE_AND_ADVANCE_BY(FOUND_OPEN_QUOTE, len_whitespace(cursor) + 1);
+                    SET_STATE_AND_ADVANCE_BY(IN_STRING, len_whitespace(cursor) + 1);
+                }
+                else if(state->mode == CSON && peek_at(len_whitespace(cursor)) == '\'') {
+                    START_STRING(state);
+                    PUSH_STRING(state, "\"", 1);
+                    SET_STATE_AND_ADVANCE_BY(IN_SQUOTED_STRING,
+                                             len_whitespace(cursor) + 1);
                 }
                 else if (peek_at(len_whitespace(cursor) + 0) == '[') {
                     START_AND_PUSH_TOKEN(state, ARRAY, "[");
@@ -695,10 +787,36 @@ rjson_(size_t len,
                             len_whitespace(cursor)+sizeof("null") - 1
                             );
                 }
+                else if(peek_at(len_whitespace(cursor)) == '#') {
+                    SET_STATE_AND_ADVANCE_BY(IN_COMMENT, 1);
+                }
+                else if(state->mode == CSON && in("}]",
+                                                    peek_at(len_whitespace(cursor)))) {
+                    CLOSE_ROOT(state);
+                    SET_STATE_AND_ADVANCE_BY(AFTER_VALUE, len_whitespace(cursor) + 1);
+                } else if(peek_at(len_whitespace(cursor)) == '|') {
+                    START_STRING(state);
+                    PUSH_STRING(state, "\"", 1);
+                    SET_STATE_AND_ADVANCE_BY(IN_VERBATIM_STRING, len_whitespace(cursor) + 1);
+
+                }
                 else if (state->tokens.stack[state->root_index].kind != ROOT) {
                     error = JSON_ERROR_ASSOC_EXPECT_VALUE;
                 }
+
                 else if (remaining(final, cursor)) {
+                    size_t inlen = 0;
+                    char32_t codepoint = unicode_codepoint((char *)cursor,
+                                                           remaining(final, cursor),
+                                                           &inlen);
+                    if(state->mode == CSON && is_bare_name_starter(codepoint)) {
+                        if(state->tokens.max == 1) {
+                            START_AND_PUSH_TOKEN(state, OBJECT, "{");
+                            PUSH_ROOT(state);
+                            SET_STATE_AND_ADVANCE_BY(ASSOC_EXPECT_KEY, 0);
+                        }
+                    } else
+
                     error = JSON_ERROR_INVALID_CHARACTER;
                 }
                 else {
@@ -712,10 +830,8 @@ rjson_(size_t len,
                 if (state->tokens.stack[state->root_index].kind == ROOT) {
                     if (remaining(final, cursor + len_whitespace(cursor))) {
                         error = JSON_ERROR_NO_SIBLINGS;
-#ifdef WANT_JSON1
-                    } else if(state->mode == JSON1 && tokens[state->max-1].kind != OBJECT) {
-                        state->error = JSON_ERROR_JSON1_ONLY_ASSOC_ROOT;
-#endif
+                    } else if(state->mode == JSON1 && state->tokens.stack[state->tokens.max-1].kind != OBJECT) {
+                        error = JSON_ERROR_JSON1_ONLY_ASSOC_ROOT;
                     } else {
                         goto exit;
                     }
@@ -744,21 +860,8 @@ rjson_(size_t len,
                     CLOSE_ROOT(state);
                     SET_STATE_AND_ADVANCE_BY(AFTER_VALUE, len_whitespace(cursor) + 1);
                 } else {
-                    SET_STATE_AND_ADVANCE_BY(ASSOC_EXPECT_KEY, 0);
+                    SET_STATE_AND_ADVANCE_BY(ASSOC_EXPECT_KEY, len_whitespace(cursor));
                 }
-                break;
-            }
-            case FOUND_OPEN_QUOTE:
-            {
-                if (peek_at(0) == '\\') {
-                    SET_STATE_AND_ADVANCE_BY(LITERAL_ESCAPE, 1);
-                } else if (peek_at(0) == '"') {
-                    PUSH_STRING(state, (char[]) {peek_at(0)}, 1);
-                    SET_STATE_AND_ADVANCE_BY(CLOSE_STRING, 1);
-                } else {
-                    SET_STATE_AND_ADVANCE_BY(IN_STRING, 0);
-                }
-
                 break;
             }
             case LITERAL_ESCAPE: {
@@ -783,7 +886,6 @@ rjson_(size_t len,
                 else {
                     error = JSON_ERROR_INVALID_ESCAPE_SEQUENCE;
                 }
-
                 break;
             }
             case IN_STRING: {
@@ -796,7 +898,6 @@ rjson_(size_t len,
                                         LITERAL_ESCAPE,
                                         CLOSE_STRING
                                 }[in("\\\"", peek_at(0))]),
-                        /*state->error == JSON_ERROR_NO_ERRORS);*/
                         1);
 
                 break;
@@ -813,7 +914,6 @@ rjson_(size_t len,
                     (
                             (int[]){0, 1}[in("-", peek_at(0))])
                     );
-
                 break;
             }
 
@@ -828,7 +928,6 @@ rjson_(size_t len,
                 } else {
                     error = JSON_ERROR_INVALID_NUMBER;
                 }
-
                 break;
             }
             case IN_NUMBER: {
@@ -843,7 +942,6 @@ rjson_(size_t len,
                             IN_NUMBER}[in(digits, peek_at(0)) != 0]),
                 (in(digits, peek_at(0)) != 0)
                 );
-
                 break;
             }
             case EXPECT_FRACTION: {
@@ -858,10 +956,8 @@ rjson_(size_t len,
                                 IN_FRACTION}[peek_at(0) == '.']),
                         (peek_at(0) == '.')
                 );
-
                 break;
             }
-
             case EXPECT_EXPONENT: {
                 if (peek_at(0) == 'e' || peek_at(0) == 'E') {
                     PUSH_STRING(state, (char[]){peek_at(0)}, 1);
@@ -870,10 +966,8 @@ rjson_(size_t len,
                     PUSH_STRING_TOKEN(NUMBER, state);
                     SET_STATE_AND_ADVANCE_BY(AFTER_VALUE, 0);
                 }
-
                 break;
             }
-
             case IN_FRACTION: {
                 error = JSON_ERROR_INVALID_NUMBER * (in(digits, peek_at(0)) == 0);
                 PUSH_STRING(state,
@@ -885,10 +979,8 @@ rjson_(size_t len,
                             IN_FRACTION_DIGIT
                         }[error == JSON_ERROR_NO_ERRORS]),
                         error == JSON_ERROR_NO_ERRORS);
-
                 break;
             }
-
             case IN_FRACTION_DIGIT: {
                 if (in(digits, peek_at(0))) {
                     PUSH_STRING(state, (char[]){peek_at(0)}, 1);
@@ -896,10 +988,8 @@ rjson_(size_t len,
                 } else {
                     SET_STATE_AND_ADVANCE_BY(EXPECT_EXPONENT, 0);
                 }
-
                 break;
             }
-
             case EXPONENT_EXPECT_PLUS_MINUS: {
                 if (peek_at(0) == '+' || peek_at(0) == '-') {
                     PUSH_STRING(state, (char[]){peek_at(0)}, 1);
@@ -907,10 +997,8 @@ rjson_(size_t len,
                 } else {
                     SET_STATE_AND_ADVANCE_BY(EXPECT_EXPONENT_DIGIT, 0);
                 }
-
                 break;
             }
-
             case EXPECT_EXPONENT_DIGIT: {
                 if (in(digits, peek_at(0))) {
                     PUSH_STRING(state, (char[]){peek_at(0)}, 1);
@@ -918,10 +1006,8 @@ rjson_(size_t len,
                 } else {
                     error = JSON_ERROR_INVALID_NUMBER;
                 }
-
                 break;
             }
-
             case IN_EXPONENT_DIGIT: {
                 if (in(digits, peek_at(0))) {
                     PUSH_STRING(state, (char[]) {peek_at(0)}, 1);
@@ -930,10 +1016,8 @@ rjson_(size_t len,
                     PUSH_STRING_TOKEN(NUMBER, state);
                     SET_STATE_AND_ADVANCE_BY(AFTER_VALUE, len_whitespace(cursor) + 0);
                 }
-
                 break;
             }
-
             case ARRAY_AFTER_VALUE: {
                 if(peek_at(len_whitespace(cursor)) == ',') {
                     SET_STATE_AND_ADVANCE_BY(EXPECT_VALUE, len_whitespace(cursor) + 1);
@@ -943,21 +1027,50 @@ rjson_(size_t len,
                 } else {
                     error = JSON_ERROR_INVALID_CHARACTER_IN_ARRAY;
                 }
-
                 break;
             }
-
             case ASSOC_EXPECT_KEY: {
                 if(peek_at(len_whitespace(cursor) + 0) == '"') {
                     START_STRING(state);
                     PUSH_STRING(state, (char[]) {peek_at(len_whitespace(cursor) + 0)}, 1);
                     SET_STATE_AND_ADVANCE_BY(IN_STRING, len_whitespace(cursor) + 1);
-                } else {
+                } else if(state->mode == CSON) {
+                    if (peek_at(len_whitespace(cursor)) == '}'){
+                        CLOSE_ROOT(state);
+                        SET_STATE_AND_ADVANCE_BY(AFTER_VALUE, len_whitespace(cursor) +1);
+                    }
+                    else if (!remaining(final, cursor)) {
+                        CLOSE_ROOT(state);
+                        SET_STATE_AND_ADVANCE_BY(AFTER_VALUE, len_whitespace(cursor));
+                        break;
+                    }
+                    cursor += len_whitespace(cursor);
+                    size_t inlen = 0;
+                    char32_t codepoint = unicode_codepoint((char *)cursor,
+                                                           remaining(final, cursor),
+                                                           &inlen);
+                    if(is_bare_name_starter(codepoint)) {
+                        char buf[8];
+                        memcpy(buf, cursor, inlen);
+
+                        START_STRING(state);
+                        PUSH_STRING(state, "\"", 1);
+                        PUSH_STRING(state, buf, inlen);
+                        SET_STATE_AND_ADVANCE_BY(
+                                IN_BARE_STRING, inlen);
+                    }
+                    else if(peek_at(len_whitespace(cursor)) == '\'') {
+                        START_STRING(state);
+                        PUSH_STRING(state, "\"", 1);
+                        SET_STATE_AND_ADVANCE_BY(IN_SQUOTED_STRING,
+                                                 len_whitespace(cursor) + 1);
+                    }
+                }
+                else {
                     error = JSON_ERROR_ASSOC_EXPECT_STRING_A_KEY;
                 }
                 break;
             }
-
             case CLOSE_STRING: {  /* fixme: non advancing state */
                 PUSH_STRING_TOKEN(STRING, state);
                 if ((state->tokens.stack)[state->root_index].kind == OBJECT) {
@@ -966,12 +1079,11 @@ rjson_(size_t len,
                 } else {
                     SET_STATE_AND_ADVANCE_BY(AFTER_VALUE, 0);
                 }
-
                 break;
             }
-
             case ASSOC_EXPECT_COLON: {
-                error = JSON_ERROR_ASSOC_EXPECT_COLON * (peek_at(len_whitespace(cursor)) != ':');
+                char* valid = state->mode == CSON ? "=:" : ":";
+                error = JSON_ERROR_ASSOC_EXPECT_COLON * (!in(valid, peek_at(len_whitespace(cursor))));
                 SET_STATE_AND_ADVANCE_BY(
                         ((int[]){
                             ASSOC_EXPECT_COLON,
@@ -979,21 +1091,98 @@ rjson_(size_t len,
                 (len_whitespace(cursor) + 1) * (error == JSON_ERROR_NO_ERRORS));
                 break;
             }
-
             case ASSOC_AFTER_INNER_VALUE: {
-                if(peek_at(len_whitespace(cursor)) == ',') {
-                    CLOSE_ROOT(state);
-                    SET_STATE_AND_ADVANCE_BY(ASSOC_EXPECT_KEY, len_whitespace(cursor) + 1);
-                } else if (peek_at(len_whitespace(cursor)) == '}'){
+                if (peek_at(len_whitespace(cursor)) == '}'){
                     CLOSE_ROOT(state);
                     CLOSE_ROOT(state);
                     SET_STATE_AND_ADVANCE_BY(AFTER_VALUE, len_whitespace(cursor) +1);
-                } else {
+                }
+                else if(peek_at(len_whitespace(cursor)) == ',') {
+                    CLOSE_ROOT(state);
+                    SET_STATE_AND_ADVANCE_BY(ASSOC_EXPECT_KEY, len_whitespace(cursor) + 1);
+                }
+                else if(state->mode == CSON && in(newline,
+                                                    peek_at(len_in(whitespace_wo_newline, cursor)))) {
+                    CLOSE_ROOT(state);
+                    SET_STATE_AND_ADVANCE_BY(ASSOC_EXPECT_KEY, len_whitespace(cursor));
+                }
+                else if (state->mode == CSON && !remaining(final, cursor)) {
+                    CLOSE_ROOT(state);
+                    CLOSE_ROOT(state);
+                    SET_STATE_AND_ADVANCE_BY(AFTER_VALUE, len_whitespace(cursor));
+                    break;
+                }
+                else {
                     error = JSON_ERROR_ASSOC_EXPECT_VALUE;
                 }
 
                 break;
             }
+            case IN_BARE_STRING: {
+                size_t inlen = 0;
+                char32_t codepoint = unicode_codepoint((char *)cursor,
+                                                       remaining(final, cursor),
+                                                       &inlen);
+                if (codepoint == -1) {
+                    error = JSON_ERROR_UNICODE_ERROR;
+                }
+                else if(is_bare_name_middle(codepoint)) {
+                    char buf [8];
+                    memcpy(buf, cursor, inlen);
+                    PUSH_STRING(state, buf, inlen);
+                    SET_STATE_AND_ADVANCE_BY(IN_BARE_STRING, inlen);
+                } else {
+                    PUSH_STRING(state, "\"", 1);
+                    PUSH_STRING_TOKEN(STRING, state);
+                    if ((state->tokens.stack)[state->root_index].kind == OBJECT) {
+                        PUSH_ROOT(state);
+                        SET_STATE_AND_ADVANCE_BY(ASSOC_EXPECT_COLON, 0);
+                    } else {
+                        SET_STATE_AND_ADVANCE_BY(AFTER_VALUE, 0);
+                    }
+                }
+            }
+                break;
+            case IN_COMMENT: {
+                if(in(newline, peek_at(0))) {
+                    SET_STATE_AND_ADVANCE_BY(EXPECT_VALUE,
+                                             len_whitespace(cursor));
+                } else {
+                    SET_STATE_AND_ADVANCE_BY(IN_COMMENT, 1);
+                }
+            }
+                break;
+            case IN_SQUOTED_STRING:
+                error = JSON_ERROR_UNESCAPED_CONTROL * (peek_at(0) < 0x20 && !in("\b\f\n\r\t", peek_at(0)));
+                PUSH_STRING(state, peek_at(0) == '"' ? "\\" : "", peek_at(0) == '"');
+                PUSH_STRING(state, peek_at(0) == '\'' ? "\"" : (char[]) {peek_at(0)}, error == JSON_ERROR_NO_ERRORS);
+                SET_STATE_AND_ADVANCE_BY(
+                        (
+                                (int[]){
+                                        IN_SQUOTED_STRING,
+                                        LITERAL_ESCAPE,
+                                        CLOSE_STRING
+                                }[in("\\'", peek_at(0))]),
+                        1);
+                break;
+            case IN_VERBATIM_STRING:
+                PUSH_STRING(state, (char[]){peek_at(0)}, peek_at(0) >= 0x20);
+                SET_STATE_AND_ADVANCE_BY(((int[]) {
+                    LOOK_FOR_VERBATIM_CONT,
+                    IN_VERBATIM_STRING,
+                }[peek_at(0) >= 0x20]), 1);
+                break;
+            case LOOK_FOR_VERBATIM_CONT:
+                if(peek_at(len_whitespace(cursor)) == '|') {
+                    PUSH_STRING(state, "\n", 1);
+                    SET_STATE_AND_ADVANCE_BY(IN_VERBATIM_STRING,
+                                             len_whitespace(cursor) + 1);
+                } else {
+                    PUSH_STRING(state, "\"", 1);
+                    SET_STATE_AND_ADVANCE_BY(CLOSE_STRING,
+                                             len_in(whitespace_wo_newline, cursor) + 0);
+                }
+                break;
         }
 
         if(error != JSON_ERROR_NO_ERRORS) {
@@ -1007,18 +1196,18 @@ rjson_(size_t len,
 }
 
 #ifdef WANT_LIBC
-static char output[STRING_POOL_SIZE];
+static char dbg_output[STRING_POOL_SIZE];
 EXPORT char* print_debug(struct tokens * tokens) {
     int j;
     int cursor = 0;
     struct token *stack = tokens->stack;
 
-    memset(output, 0, sizeof(output));
+    memset(dbg_output, 0, sizeof(dbg_output));
     for (j = 0; j < tokens->max; ++j) {
         char dest[STRING_POOL_SIZE] = {0};
 
         cursor += snprintf(
-            output + cursor, 80,
+                dbg_output + cursor, 80,
             "%d: kind: %s, root: %d, value: %s\n", j,
             (char*[]){
                     "UNSET", "ROOT", "TRUE", "FALSE", "JSON_NULL",
@@ -1033,7 +1222,7 @@ EXPORT char* print_debug(struct tokens * tokens) {
         );
     }
 
-    return output;
+    return dbg_output;
 }
 #endif
 
@@ -1093,18 +1282,24 @@ EXPORT size_t minified_string(unsigned char * target, const unsigned char * sour
 }
 
 EXPORT unsigned char * res
-to_string_(struct tokens * res tokens, struct token * start, int indent) {
+to_string_(struct tokens * res tokens, struct token * start, int indent, unsigned char* sink, int sink_size) {
     // todo: make the caller handle the buffer
 
 #define cat(where, string, token) (\
-    minified_string((where), (string), *((char*)(token)->address)) \
+    minified_string((where), (string), *((string_size_type_raw*)(token)->address)) \
 )
 #define cat_raw(where, string) ( \
     cs_memcpy((where), (string), cs_strlen((string))), cs_strlen((string)) \
 )
 
-    static unsigned char output[STRING_POOL_SIZE];
-    cs_memset(output, 0, sizeof output);
+    static unsigned char output_[STRING_POOL_SIZE];
+    unsigned char * output = output_;
+    if(sink) {
+        output = sink;
+    } else {
+        sink_size = sizeof output_;
+    }
+    cs_memset(output, 0, sink_size);
     size_t cursor = 0;
 
     struct token *stack = tokens->stack;
@@ -1122,10 +1317,10 @@ to_string_(struct tokens * res tokens, struct token * start, int indent) {
         }
 
         if(tok->kind != ROOT) {
-            cs_memcpy(buf, (char *) tok->address + 1,
-                      *((char *) tok->address));
+            cs_memcpy(buf, (char *) tok->address + sizeof string_size_type,
+                      *((string_size_type_raw *) tok->address));
             cursor += cat(output + cursor, buf, tok);
-            cs_memset(buf, 0, *((char *) tok->address));
+            cs_memset(buf, 0, *((string_size_type_raw *) tok->address));
         }
 
         if (stack[tok->root_index].kind == OBJECT && tok->kind == STRING) {
@@ -1138,7 +1333,7 @@ to_string_(struct tokens * res tokens, struct token * start, int indent) {
         }
 
         while(next_child(tokens, active_root, tok) == NULL) {
-            if((stack[tok->root_index].kind == ARRAY || stack[tok->root_index].kind == OBJECT) && active_root->kind != STRING) {
+            if((stack[tok->root_index].kind == ARRAY || stack[tok->root_index].kind == OBJECT || stack[tok->root_index].kind == STRING) && active_root->kind != STRING) {
                 cursor += cat_raw(output + cursor, !indent ? "" : "\n");
                 --depth, depth < 0 ? depth = 0 : 0;
                 cursor += cat_raw(output + cursor,
@@ -1174,4 +1369,4 @@ to_string_(struct tokens * res tokens, struct token * start, int indent) {
 #undef cat_raw
 
 }
-#endif  // CISSON_IMPLEMENTATION
+#endif  // CSON_IMPLEMENTATION

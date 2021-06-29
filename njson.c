@@ -1,6 +1,20 @@
 #include <stdlib.h>
 #include "json.h"
 
+
+EXPORT char *
+cson_to_json(char* cson, unsigned char* sink, int sink_size) {
+    struct tree tree = { 0 };
+    start_state(&tree, static_stack, sizeof static_stack,
+                static_pool, sizeof static_pool);
+    tree.mode = CSON;
+    enum json_errors err = rjson(cson, &tree);
+    if (err != JSON_ERROR_NO_ERRORS) {
+        return (char*)json_errors[err];
+    }
+    return to_string_sink(&tree, sink, sink_size);
+}
+
 static inline size_t
 in(char* res hay, unsigned char needle) {
     if (needle == '\0') return 0;
@@ -670,11 +684,16 @@ rjson_(size_t len,
                     PUSH_STRING(state, (char[]) {peek_at(len_whitespace(cursor) + 0)}, 1);
                     SET_STATE_AND_ADVANCE_BY(IN_STRING, len_whitespace(cursor) + 1);
                 } else if(state->mode == CSON) {
-                    if (!remaining(final, cursor)) {
+                    if (peek_at(len_whitespace(cursor)) == '}'){
+                        CLOSE_ROOT(state);
+                        SET_STATE_AND_ADVANCE_BY(AFTER_VALUE, len_whitespace(cursor) +1);
+                    }
+                    else if (!remaining(final, cursor)) {
                         CLOSE_ROOT(state);
                         SET_STATE_AND_ADVANCE_BY(AFTER_VALUE, len_whitespace(cursor));
                         break;
                     }
+                    cursor += len_whitespace(cursor);
                     size_t inlen = 0;
                     char32_t codepoint = unicode_codepoint((char *)cursor,
                                                            remaining(final, cursor),
@@ -722,19 +741,25 @@ rjson_(size_t len,
                 break;
             }
             case ASSOC_AFTER_INNER_VALUE: {
-                if(peek_at(len_whitespace(cursor)) == ',') {
-                    CLOSE_ROOT(state);
-                    SET_STATE_AND_ADVANCE_BY(ASSOC_EXPECT_KEY, len_whitespace(cursor) + 1);
-                }
-                else if (peek_at(len_whitespace(cursor)) == '}'){
+                if (peek_at(len_whitespace(cursor)) == '}'){
                     CLOSE_ROOT(state);
                     CLOSE_ROOT(state);
                     SET_STATE_AND_ADVANCE_BY(AFTER_VALUE, len_whitespace(cursor) +1);
+                }
+                else if(peek_at(len_whitespace(cursor)) == ',') {
+                    CLOSE_ROOT(state);
+                    SET_STATE_AND_ADVANCE_BY(ASSOC_EXPECT_KEY, len_whitespace(cursor) + 1);
                 }
                 else if(state->mode == CSON && in(newline,
                                                     peek_at(len_in(whitespace_wo_newline, cursor)))) {
                     CLOSE_ROOT(state);
                     SET_STATE_AND_ADVANCE_BY(ASSOC_EXPECT_KEY, len_whitespace(cursor));
+                }
+                else if (state->mode == CSON && !remaining(final, cursor)) {
+                    CLOSE_ROOT(state);
+                    CLOSE_ROOT(state);
+                    SET_STATE_AND_ADVANCE_BY(AFTER_VALUE, len_whitespace(cursor));
+                    break;
                 }
                 else {
                     error = JSON_ERROR_ASSOC_EXPECT_VALUE;
@@ -820,18 +845,18 @@ rjson_(size_t len,
 }
 
 #ifdef WANT_LIBC
-static char output[STRING_POOL_SIZE];
+static char dbg_output[STRING_POOL_SIZE];
 EXPORT char* print_debug(struct tokens * tokens) {
     int j;
     int cursor = 0;
     struct token *stack = tokens->stack;
 
-    memset(output, 0, sizeof(output));
+    memset(dbg_output, 0, sizeof(dbg_output));
     for (j = 0; j < tokens->max; ++j) {
         char dest[STRING_POOL_SIZE] = {0};
 
         cursor += snprintf(
-            output + cursor, 80,
+                dbg_output + cursor, 80,
             "%d: kind: %s, root: %d, value: %s\n", j,
             (char*[]){
                     "UNSET", "ROOT", "TRUE", "FALSE", "JSON_NULL",
@@ -846,7 +871,7 @@ EXPORT char* print_debug(struct tokens * tokens) {
         );
     }
 
-    return output;
+    return dbg_output;
 }
 #endif
 
@@ -906,7 +931,7 @@ EXPORT size_t minified_string(unsigned char * target, const unsigned char * sour
 }
 
 EXPORT unsigned char * res
-to_string_(struct tokens * res tokens, struct token * start, int indent) {
+to_string_(struct tokens * res tokens, struct token * start, int indent, unsigned char* sink, int sink_size) {
     // todo: make the caller handle the buffer
 
 #define cat(where, string, token) (\
@@ -916,8 +941,14 @@ to_string_(struct tokens * res tokens, struct token * start, int indent) {
     cs_memcpy((where), (string), cs_strlen((string))), cs_strlen((string)) \
 )
 
-    static unsigned char output[STRING_POOL_SIZE];
-    cs_memset(output, 0, sizeof output);
+    static unsigned char output_[STRING_POOL_SIZE];
+    unsigned char * output = output_;
+    if(sink) {
+        output = sink;
+    } else {
+        sink_size = sizeof output_;
+    }
+    cs_memset(output, 0, sink_size);
     size_t cursor = 0;
 
     struct token *stack = tokens->stack;

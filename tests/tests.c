@@ -579,7 +579,7 @@ int main(int argc, char** argv) {
     fclose(csonf);
 
     char json[1000] = {0};
-    FILE* jsonf = fopen("./cson.cson", "rb");
+    FILE* jsonf = fopen("./cson.json", "rb");
     if(jsonf == NULL) {
         perror("fail");
         return 1;
@@ -587,13 +587,12 @@ int main(int argc, char** argv) {
     fread(json, 1, 1000, jsonf);
     fclose(jsonf);
 
-    start_state(&state, static_stack, sizeof static_stack,
-                static_pool, sizeof static_pool);
+    unsigned char sink1[1000] = {0};
+    unsigned char sink2[1000] = {0};
+    cson_to_json(cson, sink1, 1000);
 
-    state.mode = CSON;
-    enum json_errors err = rjson(cson, &state);
-    puts(to_string(&state.tokens));
 
+    puts(cson_to_json("pi: 3.141592, e = 2.718281828, 'foo': 'bar'", sink2, 1000));
 
 #ifndef HAS_VLA
     printf("Total parsing time: %lld\n", total_parse_time);

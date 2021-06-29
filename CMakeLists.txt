@@ -18,13 +18,13 @@ endif()
 
 add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
 
-project(Cisson
+project(Ccson
         VERSION "0.0.1.${_var_LAST_COMMIT}"
-        DESCRIPTION "C-(J)SON - aka JSON library in C language."
-        HOMEPAGE_URL "https://gitlab.com/Meithal/cisson"
+        DESCRIPTION "CSON - aka JSON library in C language."
+        HOMEPAGE_URL "https://github.com/Meithal/ccson"
         LANGUAGES C)
 
-set(CMAKE_C_STANDARD 11 CACHE STRING "ANSI C by default")
+set(CMAKE_C_STANDARD 11 CACHE STRING "C11 by default")
 
 set(JSON_FILES
         json.h
@@ -58,10 +58,15 @@ if(CISSON_RUN_TESTS)
         target_sources(tests PRIVATE ${JSON_FILES})
     endif()
 
-    if(CMAKE_PROJECT_NAME STREQUAL Cisson)
+    if(CMAKE_PROJECT_NAME STREQUAL Cson)
         include(CTest)
         add_test(NAME main_test COMMAND tests)
     endif()
+endif()
+
+option(CISSON_WANT_SINGLE_HEADER_LIB "Generate a single header file by concatenating 2 files." ON)
+if(CISSON_WANT_SINGLE_HEADER_LIB)
+    add_custom_command(TARGET tests PRE_BUILD COMMAND cmake -P ${CMAKE_CURRENT_SOURCE_DIR}/concat.cmake VERBATIM)
 endif()
 
 option(CISSON_SELF_MANAGE_MEMORY "Manage memory yourself." OFF)
