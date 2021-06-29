@@ -230,7 +230,8 @@ enum json_mode {
 static struct token static_stack[MAX_TOKENS] = { 0 };
 static unsigned char static_pool[STRING_POOL_SIZE] = { 0 };
 
-#define string_size_type (unsigned char)
+#define string_size_type_raw unsigned short int
+#define string_size_type (string_size_type_raw)
 #define tok_len(address) ((address) - sizeof string_size_type)
 
 struct tree {

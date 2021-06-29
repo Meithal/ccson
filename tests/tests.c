@@ -569,7 +569,7 @@ int main(int argc, char** argv) {
 
     setlocale(LC_ALL, "en_US.utf8");
     puts("\n\n*** cson ***");
-    char cson[1000];
+    char cson[1000] = {0};
     FILE* csonf = fopen("./cson.cson", "rb");
     if(csonf == NULL) {
         perror("fail");
@@ -578,7 +578,7 @@ int main(int argc, char** argv) {
     fread(cson, 1, 1000, csonf);
     fclose(csonf);
 
-    char json[1000];
+    char json[1000] = {0};
     FILE* jsonf = fopen("./cson.cson", "rb");
     if(jsonf == NULL) {
         perror("fail");

@@ -910,7 +910,7 @@ to_string_(struct tokens * res tokens, struct token * start, int indent) {
     // todo: make the caller handle the buffer
 
 #define cat(where, string, token) (\
-    minified_string((where), (string), *((char*)(token)->address)) \
+    minified_string((where), (string), *((string_size_type_raw*)(token)->address)) \
 )
 #define cat_raw(where, string) ( \
     cs_memcpy((where), (string), cs_strlen((string))), cs_strlen((string)) \
@@ -936,9 +936,9 @@ to_string_(struct tokens * res tokens, struct token * start, int indent) {
 
         if(tok->kind != ROOT) {
             cs_memcpy(buf, (char *) tok->address + sizeof string_size_type,
-                      *((char *) tok->address));
+                      *((string_size_type_raw *) tok->address));
             cursor += cat(output + cursor, buf, tok);
-            cs_memset(buf, 0, *((char *) tok->address));
+            cs_memset(buf, 0, *((string_size_type_raw *) tok->address));
         }
 
         if (stack[tok->root_index].kind == OBJECT && tok->kind == STRING) {
@@ -951,7 +951,7 @@ to_string_(struct tokens * res tokens, struct token * start, int indent) {
         }
 
         while(next_child(tokens, active_root, tok) == NULL) {
-            if((stack[tok->root_index].kind == ARRAY || stack[tok->root_index].kind == OBJECT) && active_root->kind != STRING) {
+            if((stack[tok->root_index].kind == ARRAY || stack[tok->root_index].kind == OBJECT || stack[tok->root_index].kind == STRING) && active_root->kind != STRING) {
                 cursor += cat_raw(output + cursor, !indent ? "" : "\n");
                 --depth, depth < 0 ? depth = 0 : 0;
                 cursor += cat_raw(output + cursor,

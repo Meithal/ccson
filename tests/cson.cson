@@ -2,7 +2,7 @@
 pi: 3.141592
 e = 2.718281828, 'foo': 'bar'
 "nested" = ["JSON array",
-            {and = "JSON object"},
+            {and = "JSON object",},
             "with a trailing comma", # yes!
             # yes, the comment can be inside JSON arrays/objects as well
            ]
