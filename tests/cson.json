@@ -1,0 +1,19 @@
+{
+  "pi": 3.141592,
+  "e": 2.718281828,
+  "foo": "bar",
+  "nested": [
+    "JSON array",
+    {
+      "and": "JSON object"
+    },
+    "with a trailing comma"
+  ],
+  "verbatim": "a verbatim string\n  keeps the preceding whitespace\n    and joins all lines with `\\n`\n      as you see, no escape sequence is processed\n        and this string does not have a trailing \\n -->",
+  "i18n": {
+    "한국어": "Korean",
+    "日本語": "Japanese",
+    "汉语-or-漢語": "Chinese",
+    "ᏣᎳᎩ": "Cherokee"
+  }
+}

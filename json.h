@@ -4,6 +4,7 @@
 #ifdef WANT_LIBC
 #include<stdio.h>
 #include<string.h>
+#include <uchar.h>
 #endif
 
 #if (!(defined(_WIN32) || defined(_WIN64)) \
@@ -157,6 +158,7 @@ struct token {
   X(JSON_ERROR_UTF16_NOT_SUPPORTED_YET, "Code points greater than 0x0800 not supported yet.") \
   X(JSON_ERROR_INCOMPLETE_UNICODE_ESCAPE, "Incomplete unicode character sequence.") \
   X(JSON_ERROR_UNESCAPED_CONTROL, "Control characters must be escaped.") \
+  X(JSON_ERROR_UNICODE_ERROR, "Failed to decode unicode codepoint.") \
 
 #define X(a, b) a,
 enum whitespace_tokens { WHITESPACE };
@@ -185,6 +187,8 @@ static char digit_starters[] = "-0123456789";
 static char digits[] = "0123456789";
 static char digits19[] = "123456789";
 static char hexdigits[] = "0123456789abcdefABCDEF";
+static char newline[] = "\r\n";
+static char whitespace_wo_newline[] = "\t ";
 
 enum states {
     EXPECT_BOM,
@@ -192,7 +196,6 @@ enum states {
     AFTER_VALUE,
     OPEN_ARRAY,
     OPEN_ASSOC,
-    FOUND_OPEN_QUOTE,
     LITERAL_ESCAPE,
     IN_STRING,
     START_NUMBER,
@@ -209,21 +212,28 @@ enum states {
     ASSOC_EXPECT_KEY,
     CLOSE_STRING,
     ASSOC_EXPECT_COLON,
-    ASSOC_AFTER_INNER_VALUE
+    ASSOC_AFTER_INNER_VALUE,
+    IN_BARE_STRING,
+    IN_COMMENT,
+    IN_SQUOTED_STRING,
+    IN_VERBATIM_STRING,
+    LOOK_FOR_VERBATIM_CONT,
 };
 
-#ifdef WANT_JSON1
 enum json_mode {
     JSON2,
     JSON1,
     RELAXED,
+    CSON
 };
-#endif
 
 static struct token static_stack[MAX_TOKENS] = { 0 };
 static unsigned char static_pool[STRING_POOL_SIZE] = { 0 };
 
-struct cisson_state {
+#define string_size_type (unsigned char)
+#define tok_len(address) ((address) - sizeof string_size_type)
+
+struct tree {
     enum states cur_state;
     int root_index;
     struct tokens {
@@ -234,17 +244,14 @@ struct cisson_state {
         unsigned char *pool;
         unsigned int cursor;
     } strings;
-#ifdef WANT_JSON1
     enum json_mode mode;
-#endif
 };
-
 
 /* State maintenance */
 EXPORT void
-start_state(struct cisson_state * state, struct token *stack, size_t stack_size, unsigned char *pool, size_t pool_size);
+start_state(struct tree * state, struct token *stack, size_t stack_size, unsigned char *pool, size_t pool_size);
 EXPORT struct token *
-query_(struct cisson_state * state, size_t length, char query[va_(length)]);
+query_(struct tree * state, size_t length, char query[va_(length)]);
 #define query(state, string) query_((state), cs_strlen(string), (string))
 EXPORT int
 aindex(struct token* stack, struct token* which);
@@ -253,12 +260,12 @@ EXPORT enum json_errors
 rjson_(
         size_t len,
         unsigned char *cursor,
-        struct cisson_state * state);
+        struct tree * state);
 #define rjson(text, state) rjson_(cs_strlen((text)), (unsigned char*)(text), (state))
 EXPORT enum json_errors
 inject_(size_t len,
        unsigned char text[va_(len)],
-       struct cisson_state * state,
+       struct tree * state,
        struct token * where);
 #define inject(text, state, where) inject_(cs_strlen((text)), (unsigned char*)(text), (state), (where))
 /* Output */
@@ -283,16 +290,16 @@ EXPORT void push_token_kind(enum kind kind, void *res address
 EXPORT void
 delete(struct token* which);
 EXPORT void
-move(struct cisson_state* state, struct token* which, struct token* where);
+move(struct tree* state, struct token* which, struct token* where);
 EXPORT void
-rename_string_(struct cisson_state* state, struct token* which, int len, char* new_name);
+rename_string_(struct tree* state, struct token* which, int len, char* new_name);
 #define rename_string(state, which, new_name) rename_string_(state, which, cs_strlen(new_name), new_name)
 /* EZ JSON */
 EXPORT void
-insert_token(struct cisson_state * state, char *token, struct token* root);
+insert_token(struct tree * state, char *token, struct token* root);
 #define push_token(state, token) insert_token((state), (token), &(state)->tokens.stack[(state)->root_index])
 EXPORT void
-stream_tokens_(struct cisson_state * state, struct token * where, char separator, char *stream, size_t length);
+stream_tokens_(struct tree * state, struct token * where, char separator, char *stream, size_t length);
 #define stream_tokens(state, sep, stream) stream_tokens_((state), &(state)->tokens.stack[(state)->root_index], (sep), (stream), cs_strlen(stream))
 #define stream_into(state, where, sep, stream) stream_tokens_((state), (where), (sep), (stream), cs_strlen(stream))
 #define START_STRING(state_) start_string(&(state_)->strings.cursor, (state_)->strings.pool)

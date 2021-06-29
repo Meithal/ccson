@@ -7,6 +7,9 @@
 #include <stdio.h>
 #include <assert.h>
 #include <string.h>
+#include <stdlib.h>
+#include <locale.h>
+#include <uchar.h>
 
 #if (!(defined(_WIN32) || defined(_WIN64)) \
 || defined(__CYGWIN__) \
@@ -309,13 +312,11 @@ struct{char const * st; int en; } bogus_json[] = {
     (char[]){'\xBB', '4', '2', '\0'}, JSON_ERROR_INVALID_CHARACTER,
 };
 
-#ifdef WANT_JSON1
 char * bogus_json1[] = {
     "true",
     "1",
     "[1, 2, 3]"
 };
-#endif
 
 int main(int argc, char** argv) {
     /* todo: interface with ctest */
@@ -344,7 +345,7 @@ int main(int argc, char** argv) {
 
     for (i = 0; i < sizeof(valid_json) / sizeof(valid_json[0]) ; i++) {
         long long start = start_timer();
-        struct cisson_state state = {0 };
+        struct tree state = {0 };
         enum json_errors error = rjson(
                 valid_json[i].str, &state);
         long long end = elapsed(start, frequency);
@@ -367,7 +368,7 @@ int main(int argc, char** argv) {
 
     for (i = 0; i < sizeof(bogus_json) / sizeof(bogus_json[0]) ; i++) {
 
-        struct cisson_state state = {0 };
+        struct tree state = {0 };
         long long start = start_timer();
         enum json_errors error = rjson(
                 bogus_json[i].st, &state);
@@ -388,7 +389,7 @@ int main(int argc, char** argv) {
 
     for (i = 0; i < sizeof(bin_safe_json) / sizeof(bin_safe_json[0]) ; i++) {
 
-        struct cisson_state state = {0 };
+        struct tree state = {0 };
         long long start = start_timer();
         enum json_errors error = rjson_(
                 bin_safe_json[i].size,
@@ -412,19 +413,19 @@ int main(int argc, char** argv) {
 
     for (i = 0; i < sizeof(bogus_json1) / sizeof(bogus_json1[0]) ; i++) {
 
-        struct cisson_state cisson_state = {.mode=JSON1};
-        int res = rjson((unsigned char*)bogus_json1[i], strlen(bogus_json1[i]) - 1, &cisson_state);
-        printf("For >>> %s <<<, \n -> %s\n", bogus_json1[i], json_errors[cisson_state.error]);
-        puts(print_debug(&cisson_state));
-        puts(to_string(*(cisson_state.stack), res));
+        struct tree tree = {.mode=JSON1};
+        int res = rjson((unsigned char*)bogus_json1[i], strlen(bogus_json1[i]) - 1, &tree);
+        printf("For >>> %s <<<, \n -> %s\n", bogus_json1[i], json_errors[tree.error]);
+        puts(print_debug(&tree));
+        puts(to_string(*(tree.stack), res));
         fflush(stdout);
-        assert(cisson_state.error == JSON_ERROR_JSON1_ONLY_ASSOC_ROOT);
+        assert(tree.error == JSON_ERROR_JSON1_ONLY_ASSOC_ROOT);
     }
 #endif
 
     /* "[1, 2, \"foo\", [1, 2], 4  ]  ", */
     puts("\n\n\n*** EX NIHILO ***");
-    struct cisson_state state = {0};
+    struct tree state = {0};
     start_state(&state, static_stack, sizeof static_stack,
                 static_pool, sizeof static_pool);
 
@@ -541,7 +542,7 @@ int main(int argc, char** argv) {
     puts("\n\n*** TWO TREES ***");
 
     memset(&state, 0, sizeof state);
-    struct cisson_state state2 = { 0 };
+    struct tree state2 = {0 };
 
     struct token stack1[40];
     struct token stack2[40];
@@ -565,6 +566,33 @@ int main(int argc, char** argv) {
 
     assert(strcmp(to_string_compact(&state.tokens), "[1,3,[4,5,6]]") == 0);
     assert(strcmp(to_string_compact(&state2.tokens), "{\"bar\":1,\"array\":[7,8,9,2]}") == 0);
+
+    setlocale(LC_ALL, "en_US.utf8");
+    puts("\n\n*** cson ***");
+    char cson[1000];
+    FILE* csonf = fopen("./cson.cson", "rb");
+    if(csonf == NULL) {
+        perror("fail");
+        return 1;
+    }
+    fread(cson, 1, 1000, csonf);
+    fclose(csonf);
+
+    char json[1000];
+    FILE* jsonf = fopen("./cson.cson", "rb");
+    if(jsonf == NULL) {
+        perror("fail");
+        return 1;
+    }
+    fread(json, 1, 1000, jsonf);
+    fclose(jsonf);
+
+    start_state(&state, static_stack, sizeof static_stack,
+                static_pool, sizeof static_pool);
+
+    state.mode = CSON;
+    enum json_errors err = rjson(cson, &state);
+    puts(to_string(&state.tokens));
 
 
 #ifndef HAS_VLA

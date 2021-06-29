@@ -225,7 +225,7 @@ enum json_mode {
 static struct token static_stack[MAX_TOKENS] = { 0 };
 static unsigned char static_pool[STRING_POOL_SIZE] = { 0 };
 
-struct cisson_state {
+struct tree {
     enum states cur_state;
     int root_index;
     struct tokens {
@@ -244,9 +244,9 @@ struct cisson_state {
 
 /* State maintenance */
 EXPORT void
-start_state(struct cisson_state * state, struct token *stack, size_t stack_size, unsigned char *pool, size_t pool_size);
+start_state(struct tree * state, struct token *stack, size_t stack_size, unsigned char *pool, size_t pool_size);
 EXPORT struct token *
-query_(struct cisson_state * state, size_t length, char query[va_(length)]);
+query_(struct tree * state, size_t length, char query[va_(length)]);
 #define query(state, string) query_((state), cs_strlen(string), (string))
 EXPORT int
 aindex(struct token* stack, struct token* which);
@@ -255,12 +255,12 @@ EXPORT enum json_errors
 rjson_(
         size_t len,
         unsigned char *cursor,
-        struct cisson_state * state);
+        struct tree * state);
 #define rjson(text, state) rjson_(cs_strlen((text)), (unsigned char*)(text), (state))
 EXPORT enum json_errors
 inject_(size_t len,
        unsigned char text[va_(len)],
-       struct cisson_state * state,
+       struct tree * state,
        struct token * where);
 #define inject(text, state, where) inject_(cs_strlen((text)), (unsigned char*)(text), (state), (where))
 /* Output */
@@ -285,16 +285,16 @@ EXPORT void push_token_kind(enum kind kind, void *res address
 EXPORT void
 delete(struct token* which);
 EXPORT void
-move(struct cisson_state* state, struct token* which, struct token* where);
+move(struct tree* state, struct token* which, struct token* where);
 EXPORT void
-rename_string_(struct cisson_state* state, struct token* which, int len, char* new_name);
+rename_string_(struct tree* state, struct token* which, int len, char* new_name);
 #define rename_string(state, which, new_name) rename_string_(state, which, cs_strlen(new_name), new_name)
 /* EZ JSON */
 EXPORT void
-insert_token(struct cisson_state * state, char *token, struct token* root);
+insert_token(struct tree * state, char *token, struct token* root);
 #define push_token(state, token) insert_token((state), (token), &(state)->tokens.stack[(state)->root_index])
 EXPORT void
-stream_tokens_(struct cisson_state * state, struct token * where, char separator, char *stream, size_t length);
+stream_tokens_(struct tree * state, struct token * where, char separator, char *stream, size_t length);
 #define stream_tokens(state, sep, stream) stream_tokens_((state), &(state)->tokens.stack[(state)->root_index], (sep), (stream), cs_strlen(stream))
 #define stream_into(state, where, sep, stream) stream_tokens_((state), (where), (sep), (stream), cs_strlen(stream))
 #define START_STRING(state_) start_string(&(state_)->strings.cursor, (state_)->strings.pool)
@@ -405,7 +405,7 @@ push_token_kind(
 }
 
 EXPORT void
-insert_token(struct cisson_state * state, char *token, struct token* root) {
+insert_token(struct tree * state, char *token, struct token* root) {
     if(token[0] == '>') {
         int i = 0;
         while (token[i] && token[i] == '>') {
@@ -426,7 +426,7 @@ insert_token(struct cisson_state * state, char *token, struct token* root) {
 }
 
 EXPORT void
-stream_tokens_(struct cisson_state * state, struct token * where, char separator, char *stream, size_t length) {
+stream_tokens_(struct tree * state, struct token * where, char separator, char *stream, size_t length) {
     size_t i = 0;
     int old_root = state->root_index;
     state->root_index = (int)(where - state->tokens.stack);
@@ -444,12 +444,12 @@ stream_tokens_(struct cisson_state * state, struct token * where, char separator
 
 EXPORT void
 start_state(
-        struct cisson_state * state,
+        struct tree * state,
         struct token *stack,
         size_t stack_size,
         unsigned char *pool,
         size_t pool_size) {
-    memset(state, 0, sizeof (struct cisson_state));
+    memset(state, 0, sizeof (struct tree));
     memset(stack, 0, stack_size);
     memset(pool, 0, pool_size);
     state->tokens.stack = stack;
@@ -487,7 +487,7 @@ next_child(struct tokens *  tokens, struct token * root, struct token * current)
 }
 
 EXPORT struct token *
-query_(struct cisson_state * state, size_t length, char query[va_(length)]) {
+query_(struct tree * state, size_t length, char query[va_(length)]) {
     /* todo : unescape ~0, ~1, ~2 */
     size_t i = 0;
     struct token * cursor = &state->tokens.stack[1];
@@ -558,12 +558,12 @@ delete(struct token* which) {
 }
 
 EXPORT void
-move(struct cisson_state* state, struct token* which, struct token* where) {
+move(struct tree* state, struct token* which, struct token* where) {
     which->root_index = aindex(state->tokens.stack, where);
 }
 
 EXPORT void
-rename_string_(struct cisson_state* state, struct token* which, int len, char* new_name) {
+rename_string_(struct tree* state, struct token* which, int len, char* new_name) {
     START_STRING(state);
     PUSH_STRING(state, "\"", 1);
     PUSH_STRING(state, new_name, len);
@@ -575,7 +575,7 @@ rename_string_(struct cisson_state* state, struct token* which, int len, char* n
 EXPORT enum json_errors
 inject_(size_t len,
        unsigned char text[va_(len)],
-       struct cisson_state * state,
+       struct tree * state,
        struct token * where) {
     enum states old_state = state->cur_state;
     int old_root = state->root_index;
@@ -592,7 +592,7 @@ inject_(size_t len,
 EXPORT enum json_errors
 rjson_(size_t len,
        unsigned char *cursor,
-       struct cisson_state * state) {
+       struct tree * state) {
 
 #define peek_at(where) cursor[where]
 #define SET_STATE_AND_ADVANCE_BY(which_, advance_) \

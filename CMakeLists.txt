@@ -24,7 +24,7 @@ project(Cisson
         HOMEPAGE_URL "https://gitlab.com/Meithal/cisson"
         LANGUAGES C)
 
-set(CMAKE_C_STANDARD 90 CACHE STRING "ANSI C by default")
+set(CMAKE_C_STANDARD 11 CACHE STRING "ANSI C by default")
 
 set(JSON_FILES
         json.h
@@ -45,6 +45,8 @@ endif()
 
 option(CISSON_RUN_TESTS "Build an executable that checks the library works on your machine (recommended)" ON)
 if(CISSON_RUN_TESTS)
+    file(COPY tests/cson.cson DESTINATION ${CMAKE_BINARY_DIR})
+    file(COPY tests/cson.json DESTINATION ${CMAKE_BINARY_DIR})
     add_executable(tests tests/tests.c)
     add_executable(tests_single tests/tests.c)
     target_compile_definitions(tests_single PUBLIC CISSON_SINGLE_HEADER)
@@ -60,16 +62,6 @@ if(CISSON_RUN_TESTS)
         include(CTest)
         add_test(NAME main_test COMMAND tests)
     endif()
-endif()
-
-option(CISSON_WANT_SINGLE_HEADER_LIB "Generate a single header file by concatenating 2 files." ON)
-if(CISSON_WANT_SINGLE_HEADER_LIB)
-    add_custom_command(TARGET tests PRE_BUILD COMMAND cmake -P ${CMAKE_CURRENT_SOURCE_DIR}/concat.cmake VERBATIM)
-endif()
-
-option(CISSON_WANT_JSON1 "Add JSON 1 support." OFF)
-if(CISSON_WANT_JSON1)
-    add_compile_definitions("WANT_JSON1")
 endif()
 
 option(CISSON_SELF_MANAGE_MEMORY "Manage memory yourself." OFF)
