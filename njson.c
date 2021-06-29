@@ -109,7 +109,6 @@ push_string(const unsigned int *cursor,
             char* string,
             int length) {
     /* todo: memmove if we insert */
-    /* todo: support strings longer than 256 characters */
     cs_memcpy(
             pool + *cursor + sizeof string_size_type + pool[*cursor],
             string,

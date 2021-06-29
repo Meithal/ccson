@@ -3,8 +3,10 @@ It comes as a single file and has one function that converts
 CSON text to JSON text.
 
 ## Requirements
-* C11 compiler, with `uchar.h` standard header. 
-  Tested with MSVC and GCC.
+* C11 compiler.
+* `<uchar.h>`. 
+  
+Tested with MSVC and GCC.
 
 ## Example
 
